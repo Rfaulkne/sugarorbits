@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: sugar-orbits
+    runtime: python
+    region: frankfurt
+    plan: 0.5c-512mb
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    numInstances: 1
+    disk:
+      name: sugar-orbits-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data
+      - key: DEXCOM_SHARE_REGION
+        value: ous
+      - key: DEXCOM_POLL_SECONDS
+        value: 300
+      - key: APP_ACCESS_CODE
+        sync: false
+      - key: APP_SESSION_SECRET
+        generateValue: true
+      - key: DEXCOM_SHARE_USERNAME
+        sync: false
+      - key: DEXCOM_SHARE_PASSWORD
+        sync: false

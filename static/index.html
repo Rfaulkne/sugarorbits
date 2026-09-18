@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sugar Orbits">
+  <meta name="format-detection" content="telephone=no">
+  <title>Sugar Orbits · Dexcom glucose portrait</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="/app-icon-180.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-head">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Sugar Orbits</div>
+      <div class="connection">
+        <span id="connection-status" class="connection-status">Checking Dexcom…</span>
+        <button id="sync-button" class="connection-action quiet-action" type="button" hidden>Sync now</button>
+      </div>
+    </header>
+
+    <div id="app-message" class="app-message" role="status" hidden></div>
+
+    <main>
+      <section class="portrait" aria-label="Four-week glucose history shown as seven-day radial portraits">
+        <nav class="view-nav" aria-label="Glucose views">
+          <button class="view-option is-active" type="button" data-view="days">daily orbit</button>
+          <button class="view-option" type="button" data-view="patterns">trends</button>
+        </nav>
+        <div class="portrait-period">
+          <strong id="period-title">Preview</strong>
+          <span id="period-note">sample data until Dexcom Share is configured</span>
+        </div>
+        <div id="radial-stage" class="radial-stage">
+          <svg id="radial-svg" class="radial-svg" role="img" aria-labelledby="radial-title radial-description"></svg>
+          <div id="intro-vortex" class="intro-vortex" aria-hidden="true">
+            <div id="intro-connect" class="intro-connect">
+              <div class="intro-orbit-lockup">
+                <svg class="intro-connect-svg" viewBox="0 0 240 240" role="presentation">
+                  <g id="intro-connect-orbits" class="intro-connect-orbits"></g>
+                </svg>
+                <strong>SUGAR ORBITS</strong>
+              </div>
+              <span class="intro-connect-status">connecting dexcom share</span>
+            </div>
+            <div id="intro-curves" class="intro-curves" hidden>
+              <div class="vortex-field">
+                <svg id="intro-data-svg" class="intro-data-svg" role="presentation"></svg>
+              </div>
+              <span class="vortex-caption">forming seven days</span>
+            </div>
+          </div>
+        </div>
+        <div id="mobile-orbit-controls" class="mobile-orbit-controls">
+          <div id="day-dial-panel" class="day-dial-panel">
+            <div class="day-dial-readout">
+              <output id="day-dial-label" for="day-dial">all 7 · average</output>
+              <button id="day-dial-all" class="day-dial-all is-active" type="button">all</button>
+            </div>
+            <div class="day-dial-row">
+              <span>older</span>
+              <input id="day-dial" type="range" min="0" max="6" step="1" value="6" aria-label="Select one of the seven daily orbits">
+              <span>newer</span>
+            </div>
+          </div>
+          <p class="mobile-swipe-hint" aria-hidden="true"><span>←</span> swipe orbit to switch view <span>→</span></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-foot">
+      <div class="legend" aria-label="Glucose color key">
+        <span class="legend-item"><span class="legend-dot high-dot"></span>above</span>
+        <span class="legend-item"><span class="legend-dot low-dot"></span>below</span>
+      </div>
+      <span id="freshness" class="freshness">preview data</span>
+    </footer>
+  </div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
