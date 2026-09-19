@@ -1236,20 +1236,20 @@
       if (event.pointerId !== modeHoldPointer) return;
       if (pointerDistanceFromCenter(event) > innerRadius * 0.75) cancelModeHold();
     };
-    svg.onpointermove = event => {
+    stage.onpointermove = event => {
       handleOrbitPointer(event);
       trackModeHold(event);
     };
-    svg.onpointerdown = event => {
+    stage.onpointerdown = event => {
       handleOrbitPointer(event);
       beginModeHold(event);
     };
-    svg.onpointerup = cancelModeHold;
-    svg.onpointerleave = event => {
+    stage.onpointerup = cancelModeHold;
+    stage.onpointerleave = event => {
       cancelModeHold();
       if (viewMode === "days" && event.pointerType !== "touch") clearDay();
     };
-    svg.onpointercancel = svg.onpointerleave;
+    stage.onpointercancel = stage.onpointerleave;
     svg.oncontextmenu = event => {
       if (phoneLayout.matches || pointerDistanceFromCenter(event) <= innerRadius * 0.75) event.preventDefault();
     };
@@ -1543,13 +1543,17 @@
   stage.addEventListener("pointercancel", event => endHistoryPinch(event.pointerId));
 
   stage.addEventListener("pointerdown", event => {
-    if (!(phoneLayout.matches || roundDisplayLayout.matches)
-        || event.pointerType !== "touch" || !introVortex.hidden) return;
+    if (!introVortex.hidden) return;
+    // Some kiosk touch drivers deliver mouse-like pointer events.
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     // Only a single finger may switch views; reserve multi-touch for history.
-    if (!event.isPrimary || activeTouchPoints.size > 1) {
+    if (event.isPrimary === false || activeTouchPoints.size > 1) {
       swipeStart = null;
       return;
     }
+    // Capture on the persistent stage so releases cannot disappear when the
+    // SVG is refreshed or a finger leaves the painted curve.
+    if (stage.setPointerCapture) stage.setPointerCapture(event.pointerId);
     swipeStart = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -1563,9 +1567,9 @@
     const deltaY = event.clientY - swipeStart.y;
     const elapsed = performance.now() - swipeStart.time;
     swipeStart = null;
-    if (elapsed > 900 || Math.abs(deltaX) < 54 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    if (elapsed > 2000 || Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
     const modes = ["art", "days", "patterns"];
-    const nextIndex = Math.max(0, Math.min(modes.length - 1, modes.indexOf(viewMode) + (deltaX < 0 ? 1 : -1)));
+    const nextIndex = (modes.indexOf(viewMode) + (deltaX < 0 ? 1 : -1) + modes.length) % modes.length;
     const nextMode = modes[nextIndex];
     if (nextMode === viewMode) return;
     viewMode = nextMode;

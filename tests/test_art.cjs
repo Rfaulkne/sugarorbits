@@ -42,9 +42,15 @@ function fire(type,id,x,y=200) {now+=100; for(const f of listeners[type]||[]) f(
 function swipe(from,to) {fire('pointerdown',1,from);fire('pointerup',1,to);}
 swipe(400,300);assert.equal(context.viewMode,'days');
 swipe(400,300);assert.equal(context.viewMode,'patterns');
-swipe(400,300);assert.equal(changes,2,'Do not wrap at the last view');
+swipe(400,300);assert.equal(context.viewMode,'art','Wrap to art');
+swipe(300,400);assert.equal(context.viewMode,'patterns','Either direction can leave art');
 swipe(300,400);assert.equal(context.viewMode,'days');
 swipe(300,400);assert.equal(context.viewMode,'art');
 fire('pointerdown',1,400);fire('pointerdown',2,450);fire('pointerup',2,450);fire('pointerup',1,300);assert.equal(context.viewMode,'art');
 fire('pointerdown',1,400);fire('pointercancel',1,400);fire('pointerup',1,300);assert.equal(context.viewMode,'art');
+fire('pointerdown',1,400);now+=1000;fire('pointerup',1,350);assert.equal(context.viewMode,'days','Allow a slower short swipe');
+const mouse={pointerId:99,pointerType:'mouse',isPrimary:true,button:0,clientX:400,clientY:200};
+for(const f of listeners.pointerdown) f(mouse);
+for(const f of listeners.pointerup) f({...mouse,clientX:300});
+assert.equal(context.viewMode,'patterns','Support mouse-emulated touch');
 console.log('Art geometry, palette, missing-data gaps and three-view gesture checks passed.');

@@ -1,5 +1,12 @@
 # Sugar Orbits version history
 
+## 0.3.1 — 2026-09-19
+
+- Fix swipe robustness: capture the pointer on the stable stage and keep ring interaction there across SVG refreshes.
+- Accept left-button drag events from mouse-emulating kiosk touch drivers as well as native touch.
+- Allow slower swipes (up to two seconds, minimum 40px); wrap between the three views in either direction so Art is never a dead end.
+- Art geometry, native/mouse-like gestures, slower swipes, cancellation, multi-touch and Python checks pass. Physical Pi verification pending; exact cause on the device was not directly observed.
+
 ## 0.3.0 — 2026-09-19
 
 - Add a text-free art face as the default on round displays and phones. Desktop starts in detail with an Art button.
