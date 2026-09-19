@@ -1423,6 +1423,7 @@
   stage.addEventListener("pointerdown", event => {
     if (!roundDisplayLayout.matches || event.pointerType !== "touch" || !introVortex.hidden) return;
     activeTouchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (activeTouchPoints.size > 1) swipeStart = null;
     if (!historyPinch && activeTouchPoints.size === 3) {
       const pointerIds = [...activeTouchPoints.keys()].slice(0, 3);
       historyPinch = {
@@ -1463,7 +1464,13 @@
   stage.addEventListener("pointercancel", event => endHistoryPinch(event.pointerId));
 
   stage.addEventListener("pointerdown", event => {
-    if (!phoneLayout.matches || event.pointerType !== "touch" || !introVortex.hidden) return;
+    if (!(phoneLayout.matches || roundDisplayLayout.matches)
+        || event.pointerType !== "touch" || !introVortex.hidden) return;
+    // Only a single finger may switch views; reserve multi-touch for history.
+    if (!event.isPrimary || activeTouchPoints.size > 1) {
+      swipeStart = null;
+      return;
+    }
     swipeStart = {
       pointerId: event.pointerId,
       x: event.clientX,

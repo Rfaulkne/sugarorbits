@@ -1,4 +1,4 @@
-const CACHE_NAME = "sugar-orbits-shell-v3";
+const CACHE_NAME = "sugar-orbits-shell-v0.2.0";
 const STATIC_ASSETS = [
   "/styles.css",
   "/app.js",

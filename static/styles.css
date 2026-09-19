@@ -905,6 +905,9 @@ body.round-display {
 }
 
 .round-display .radial-svg {
+  /* Enlarge both views together; SVG screen coordinates keep touch aligned. */
+  transform: scale(1.15);
+  transform-origin: center;
   width: min(90vmin, 720px);
   max-height: 90vmin;
   overflow: visible;

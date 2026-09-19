@@ -1,5 +1,15 @@
 # Sugar Orbits version history
 
+## 0.2.0 — 2026-09-19
+
+- Enable one-finger horizontal swipes on the round Pi display: left opens average/trends, right returns to seven days.
+- Cancel view swiping when a second finger joins so three-finger history navigation remains separate.
+- Enlarge the round display orbit graphic, center text and time labels to 115% in both views. Fixed top/bottom controls stay in their circular safe area.
+- Refresh the static asset cache version.
+- Preserve the previous working revision at archive/v0.1.1-pi-verified.
+- User confirmed v0.1.1 backfills the last 24 hours on the Pi.
+- JavaScript syntax and gesture regression checks passed; physical screen validation pending.
+
 ## 0.1.1 — 2026-09-19
 
 - Reconcile the complete available Dexcom Share 24-hour window (up to 288 readings) on startup and every scheduled/manual sync. A recent cached reading no longer prevents filling earlier holes.
