@@ -787,9 +787,22 @@
         const layer = svgElement("g", { class: "art-ring", "aria-hidden": "true" });
         const defs = svgElement("defs", {});
         layer.appendChild(defs);
+        const mask = svgElement("mask", {
+          id: `art-mask-${dayIndex}`, maskUnits: "userSpaceOnUse",
+          x: 0, y: 0, width: cx * 2, height: cx * 2
+        });
+        defs.appendChild(mask);
+        const colors = svgElement("g", { mask: `url(#art-mask-${dayIndex})` });
+        layer.appendChild(colors);
         let segmentId = 0;
         chunksFor(day).forEach(chunk => {
           const points = shapedPoints(chunk, cx, cy, radius, shapeGap);
+          // One continuous silhouette per data chunk avoids a scalloped edge
+          // from hundreds of independently capped gradient strokes.
+          mask.appendChild(svgElement("path", {
+            d: smoothPath(points), fill: "none", stroke: "white",
+            "stroke-width": 1.9, "stroke-linecap": "round", "stroke-linejoin": "round"
+          }));
           let start = points[0];
           for (let i = 1; i < points.length; i++) {
             const control = points[i];
@@ -811,7 +824,7 @@
             const d = `M${start.x.toFixed(2)},${start.y.toFixed(2)}` + (i < points.length - 1
               ? ` Q${control.x.toFixed(2)},${control.y.toFixed(2)} ${end.x.toFixed(2)},${end.y.toFixed(2)}`
               : ` L${end.x.toFixed(2)},${end.y.toFixed(2)}`);
-            layer.appendChild(svgElement("path", { d, stroke: `url(#${id})`, class: "art-segment" }));
+            colors.appendChild(svgElement("path", { d, stroke: `url(#${id})`, class: "art-segment" }));
             start = end;
           }
         });
@@ -865,6 +878,8 @@
     const daysLayer = svgElement("g", { class: "view-layer days-layer" });
     const patternsLayer = svgElement("g", { class: "view-layer patterns-layer" });
     const artLayer = svgElement("g", { class: "view-layer art-layer" });
+    const artBreathing = svgElement("g", { class: "art-breathing" });
+    artLayer.appendChild(artBreathing);
     let artBuilt = false;
     svg.append(artLayer, daysLayer, patternsLayer);
 
@@ -1051,6 +1066,7 @@
     }
     patternsLayer.appendChild(summaryLayer);
 
+    const centerBrand = addText(svg, cx, cy - 50, "center-brand", "middle", "Sugar Orbits");
     const centerValue = Number.isFinite(currentProfile.average) ? currentProfile.average.toFixed(1) : "—";
     const centerValueText = addText(svg, cx, cy - 7, "center-value", "middle", centerValue);
     const centerUnitText = addText(svg, cx, cy + 17, "center-unit", "middle", "MMOL/L");
@@ -1257,9 +1273,11 @@
     applyViewMode = () => {
       const showArt = viewMode === "art";
       document.body.classList.toggle("art-view", showArt);
+      centerBrand.setAttribute("y", String(showArt ? cy : cy - 50));
+      centerBrand.setAttribute("dominant-baseline", showArt ? "middle" : "auto");
       if (showArt && !artBuilt) {
         currentProfile.days.forEach((day, index) => {
-          artLayer.appendChild(artRing(day, index, cx, cy, innerRadius + index * gap, shapeGap));
+          artBreathing.appendChild(artRing(day, index, cx, cy, innerRadius + index * gap, shapeGap));
         });
         artBuilt = true;
       }
@@ -1456,12 +1474,27 @@
   });
 
   let lastInteraction = performance.now();
-  document.addEventListener("pointerdown", () => {
-    const idleFor = performance.now() - lastInteraction;
+  let idleTimer;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  function updateArtMotion() {
+    document.body.classList.toggle("art-motion-paused",
+      document.hidden || reducedMotion.matches || performance.now() - lastInteraction >= 120000);
+  }
+  function recordInteraction(event) {
+    const wasIdle = performance.now() - lastInteraction >= 120000;
     lastInteraction = performance.now();
-    if (idleFor >= 120000) revealArt();
-  }, { capture: true, passive: true });
-  document.addEventListener("pointermove", () => { lastInteraction = performance.now(); }, { passive: true });
+    window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(updateArtMotion, 120050);
+    updateArtMotion();
+    if (wasIdle && event.type === "pointerdown") revealArt();
+  }
+  document.addEventListener("pointerdown", recordInteraction, { capture: true, passive: true });
+  document.addEventListener("pointermove", recordInteraction, { passive: true });
+  document.addEventListener("keydown", recordInteraction);
+  document.addEventListener("visibilitychange", updateArtMotion);
+  reducedMotion.addEventListener("change", updateArtMotion);
+  idleTimer = window.setTimeout(updateArtMotion, 120050);
+  updateArtMotion();
 
   let swipeStart = null;
   const activeTouchPoints = new Map();

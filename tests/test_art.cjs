@@ -15,7 +15,9 @@ vm.runInContext(extract('  function midpoint(', '  function closedSmoothPath(') 
   extract('  function artRing(', '  let revealTimer'), context);
 const points = [{minute:0,value:3},{minute:5,value:6},{minute:10,value:12},{minute:80,value:5},{minute:85,value:7}];
 const ring=context.artRing(points,0,360,363,200,10);
-const paths=ring.children.filter(n=>n.tag==='path');
+const paths=ring.children.find(n=>n.attrs.mask).children.filter(n=>n.tag==='path');
+const mask=ring.children[0].children.find(n=>n.tag==='mask');
+assert.equal(mask.children.length,2,'Each continuous data chunk gets one smooth silhouette');
 assert.equal(paths.length,3,'A missing-data gap must not get a connecting segment');
 const chunks=context.chunksFor(points);
 let offset=0;
@@ -28,7 +30,7 @@ for (const chunk of chunks) {
 }
 assert.notEqual(palette.color(3),palette.color(13));
 assert.equal(palette.color(6.4),'rgb(207,199,225)');
-assert.equal(context.artRing([],1,360,363,200,10).children.filter(n=>n.tag==='path').length,0);
+assert.equal(context.artRing([],1,360,363,200,10).children.find(n=>n.attrs.mask).children.length,0);
 const listeners={};let now=0,changes=0;
 Object.assign(context,{
  stage:{addEventListener:(n,f)=>(listeners[n]??=[]).push(f),classList:{add(){},remove(){}}},

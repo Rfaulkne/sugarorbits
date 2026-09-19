@@ -1,12 +1,12 @@
-# Art face — v0.3.0
+# Art face — v0.4.0
 
-The round display and phone start with seven gradient data traces and no visible labels, numbers, buttons, or guide circles. Swipe left for the existing seven-day detail view, left again for trends, and right to return. As of v0.3.1, views wrap in either direction. On desktop, use the Art button or left/right arrow keys.
+The round display and phone start with seven gradient data traces and a simple centered Sugar Orbits title, without numbers, buttons, or guide circles. Swipe left for the existing seven-day detail view, left again for trends, and right to return. As of v0.3.1, views wrap in either direction. On desktop, use horizontal mouse drags or left/right arrow keys.
 
 The palette is reused from the September 16 spectrum prototype. Its blue/cyan, pale neutral, violet, coral and orange stops interpolate by mmol/L, not clock position. It is expressive rather than a binary high/low legend; the unchanged detail view retains blue/orange threshold segments. Art uses the same shaped data geometry and gap boundaries as detail. It does not fabricate seven full rings when fewer days exist.
 
-The reveal lasts under two seconds, with staggered ring movement and opacity, and then stops. Reduced-motion mode skips it. A pointer-down after two minutes without pointer activity replays it when already in Art. This is an idle-touch heuristic; there is no direct display-power event from labwc to the web page. Confirm that the actual screen wake delivers that touch. The selected mode is retained during screen sleep; waking from detail does not force Art.
+The reveal lasts under two seconds, with staggered ring movement and opacity, and then settles into a slow ten-second, 100%–103% breathing cycle. Reduced-motion mode skips it. A pointer-down after two minutes without pointer activity replays it when already in Art. This is an idle-touch heuristic; there is no direct display-power event from labwc to the web page. Confirm that the actual screen wake delivers that touch. The selected mode is retained during screen sleep; waking from detail does not force Art.
 
-No text or sync alerts appear in Art. Swipe to detail to check the data status or retry a failed sync. Cached data can remain on screen while offline. If initial live loading fails with no data loaded, the app falls back to the visibly labelled sample/detail view.
+Only the Sugar Orbits title appears in Art; sync alerts remain in detail. Swipe to detail to check the data status or retry a failed sync. Cached data can remain on screen while offline. If initial live loading fails with no data loaded, the app falls back to the visibly labelled sample/detail view.
 
 Slower swipes and mouse-emulated touch are supported in v0.3.1. The stable stage captures each swipe even if the data SVG is refreshed.
 
@@ -32,3 +32,13 @@ Each archive branch points to a named revision; do not advance archive branches 
 
 Run `python -m unittest discover -s tests` and `node tests/test_art.cjs`.
 Physical Pi checks pending: appearance at 800x800, no ring clipping, responsiveness with seven full days, swipe navigation, and reveal on tap-to-wake. Browser binary installation failed in development, so no rendered browser screenshot has been verified.
+
+## v0.4.0 visual changes
+
+The title sits at the center on Art and above the numeric readout on detail/trends. The old top brand and bottom view toggles were removed. Swipe navigation remains unchanged from the verified v0.3.1 implementation.
+
+Colour segments now paint through one continuous stroke mask per uninterrupted data chunk. The visible stroke remains 1.9 SVG units wide; the underlying colour strokes are wider to avoid cap-shaped seams. Glucose values and path geometry have not been changed. Confirm actual antialiasing and frame rate on the Pi.
+
+Breathing pauses after 120 seconds without pointer/keyboard input, outside Art, and when the browser document is hidden. Input resumes it. This matches the configured screen-idle duration but does not read labwc display power state directly. Reduced motion disables the animation entirely. No measured energy-saving claim is made.
+
+Archives: archive/v0.3.1-swipe-verified and archive/v0.4.0-breathing-title.

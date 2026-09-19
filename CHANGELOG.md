@@ -1,5 +1,15 @@
 # Sugar Orbits version history
 
+## 0.4.0 — 2026-09-19
+
+- Art rings breathe together from 100% to 103% scale over a ten-second cycle. The center title stays still.
+- Pause breathing after two minutes of no pointer/keyboard interaction, when the page is hidden, or outside Art. Respect reduced motion. This uses browser idle timing, not a hardware power-state signal.
+- Clip wider gradient colour strokes through continuous 1.9px data-curve silhouettes to reduce segmented edge artifacts without changing data geometry.
+- Place Sugar Orbits in the middle of Art and above the central detail values. Remove the top brand and bottom view buttons; swipes, mouse drags and arrow keys navigate.
+- Preserve archive/v0.3.1-swipe-verified before the visual changes.
+- Trend calculations and glucose collection unchanged.
+- Validation: 10 Python tests, JavaScript syntax and art geometry/gap/gesture checks pass. Physical display rendering, animation performance and sleep timing await user confirmation.
+
 ## 0.3.1 — 2026-09-19
 
 - Fix swipe robustness: capture the pointer on the stable stage and keep ring interaction there across SVG refreshes.

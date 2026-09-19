@@ -1059,12 +1059,12 @@ body.round-display {
 .art-view .app-foot,
 .art-view .mobile-orbit-controls,
 .art-view .app-message,
-.art-view .radial-svg > text { display: none !important; }
+.art-view .radial-svg > text:not(.center-brand) { display: none !important; }
 .art-view .intro-vortex { display: none !important; }
 .art-layer { pointer-events: none; }
 .art-segment {
   fill: none;
-  stroke-width: 1.9px;
+  stroke-width: 5px;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1081,4 +1081,34 @@ body.round-display {
 }
 @media (prefers-reduced-motion: reduce) {
   .is-art-revealing .art-ring { animation: none; }
+}
+
+.center-brand {
+  fill: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+.art-view .center-brand {
+  fill: rgba(231, 226, 239, 0.78);
+  font-size: 19px;
+  letter-spacing: 0.045em;
+}
+.art-breathing {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: orbit-breathe 10s ease-in-out infinite;
+}
+@keyframes orbit-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+.art-motion-paused .art-breathing,
+.art-layer.is-hidden .art-breathing {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .art-breathing { animation: none; }
 }
