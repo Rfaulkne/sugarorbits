@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -70,19 +69,6 @@ class DexcomShareCollector:
             self._client = self.client_factory(**arguments)
         return self._client
 
-    def _minutes_to_fetch(self) -> int:
-        newest = self.store.stats().get("newestSystemTime")
-        if not newest:
-            return 1440
-        try:
-            latest = datetime.fromisoformat(str(newest).replace("Z", "+00:00"))
-            if latest.tzinfo is None:
-                latest = latest.replace(tzinfo=timezone.utc)
-            age_minutes = (datetime.now(timezone.utc) - latest.astimezone(timezone.utc)).total_seconds() / 60
-        except (TypeError, ValueError):
-            return 1440
-        return max(60, min(1440, math.ceil(age_minutes) + 20))
-
     def sync(self) -> int:
         if not self.config.configured:
             raise DexcomShareError(
@@ -92,10 +78,10 @@ class DexcomShareCollector:
             return 0
         self._syncing = True
         try:
-            minutes = self._minutes_to_fetch()
-            max_count = min(288, max(12, math.ceil(minutes / 5) + 4))
+            # Always reconcile the full Share window, including holes before
+            # the newest cached reading. SQLite deduplicates by timestamp.
             readings = self._client_instance().get_glucose_readings(
-                minutes=minutes, max_count=max_count
+                minutes=1440, max_count=288
             )
             normalized = []
             for reading in readings:
@@ -153,7 +139,11 @@ class DexcomShareCollector:
         # Wi-Fi or Dexcom Share is temporarily unreachable.
         self.sync_safely()
         self._initial_attempt_complete.set()
-        while not self._stop_event.wait(max(60, self.config.poll_seconds)):
+        while True:
+            # Wi-Fi may not be ready at boot; retry failures after one minute.
+            delay = 60 if self._last_error else max(60, self.config.poll_seconds)
+            if self._stop_event.wait(delay):
+                break
             self.sync_safely()
 
     def wait_for_initial_attempt(self, timeout: float = 4.0) -> bool:

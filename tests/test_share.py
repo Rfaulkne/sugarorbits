@@ -97,6 +97,71 @@ class DexcomShareTests(unittest.TestCase):
         self.assertEqual(records[0]["valueMgDl"], 117)
         self.assertIsNotNone(status["lastSyncAt"])
 
+    def test_restart_backfills_holes_before_recent_cached_reading(self) -> None:
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+
+        class WindowedDexcom(FakeDexcom):
+            def get_glucose_readings(self, minutes, max_count):
+                self.request = (minutes, max_count)
+                cutoff = now - timedelta(minutes=minutes)
+                return sorted(
+                    [r for r in self.readings if r.datetime >= cutoff],
+                    key=lambda r: r.datetime, reverse=True,
+                )[:max_count]
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = GlucoseStore(Path(directory))
+            recent = now - timedelta(minutes=5)
+            store.upsert([{
+                "systemTime": recent.isoformat(), "displayTime": recent.isoformat(),
+                "valueMgDl": 108, "valueMmol": 6.0,
+            }])
+            # Simulate a restarted collector with a recent point but a large hole.
+            WindowedDexcom.readings = [
+                FakeReading(now - timedelta(minutes=5 * i), 108)
+                for i in range(288)
+            ]
+            collector = DexcomShareCollector(
+                DexcomShareConfig(username="test", password="test"),
+                GlucoseStore(Path(directory)), client_factory=WindowedDexcom,
+            )
+            collector.start()
+            try:
+                self.assertTrue(collector.wait_for_initial_attempt(2))
+            finally:
+                collector.stop()
+            self.assertEqual(store.stats()["count"], 288)
+            self.assertEqual(collector._client.request, (1440, 288))
+            # A later response can fill an older hole even with fresh data cached.
+            extra = FakeReading(now - timedelta(hours=12, minutes=2), 126)
+            WindowedDexcom.readings = [extra, FakeReading(now, 108)]
+            collector.sync()
+            self.assertEqual(store.stats()["count"], 289)
+            self.assertEqual(len(store.records(1)), 289)
+
+    def test_boot_network_failure_retries_after_one_minute(self) -> None:
+        class UnavailableDexcom(FakeDexcom):
+            def get_glucose_readings(self, minutes, max_count):
+                raise ConnectionError("offline")
+
+        class StopAfterWait:
+            delay = None
+            def wait(self, delay):
+                self.delay = delay
+                return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            collector = DexcomShareCollector(
+                DexcomShareConfig(username="test", password="test"),
+                GlucoseStore(Path(directory)), client_factory=UnavailableDexcom,
+            )
+            stop = StopAfterWait()
+            collector._stop_event = stop
+            collector._run()
+            self.assertEqual(stop.delay, 60)
+            self.assertTrue(collector.wait_for_initial_attempt(0))
+            self.assertIn("offline", collector.status()["lastError"])
+
 
 class GlucoseStoreTests(unittest.TestCase):
     def test_archive_orders_records_and_reports_stats(self) -> None:

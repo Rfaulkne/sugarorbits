@@ -1,5 +1,13 @@
 # Sugar Orbits version history
 
+## 0.1.1 — 2026-09-19
+
+- Reconcile the complete available Dexcom Share 24-hour window (up to 288 readings) on startup and every scheduled/manual sync. A recent cached reading no longer prevents filling earlier holes.
+- Retry failed background sync after 60 seconds, including boot-time Wi-Fi failures; successful syncs retain the configured interval.
+- Timestamp-based deduplication and existing archived history are preserved. The seven-day display continues splitting readings into calendar-day rings.
+- Validation: 10 unit tests pass, including restart with recent cached data, older gap backfill, deduplication and boot failure retry. Physical Pi/live-account verification pending.
+- User confirmed permanent two-minute screen sleep and tap-to-wake on September 18.
+
 ## 0.1.0-pi-baseline — 2026-09-18
 
 Imported the preserved 2026-09-14 Pi round/week-history app without application code changes.
