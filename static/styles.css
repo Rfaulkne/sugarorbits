@@ -1051,3 +1051,34 @@ body.round-display {
   .intro-curves { transition-duration: 180ms; }
   .intro-connect-orbits { animation: none; }
 }
+
+/* Art face: only data traces. Detail/status remain one swipe away. */
+.art-view .app-head,
+.art-view .view-nav,
+.art-view .portrait-period,
+.art-view .app-foot,
+.art-view .mobile-orbit-controls,
+.art-view .app-message,
+.art-view .radial-svg > text { display: none !important; }
+.art-view .intro-vortex { display: none !important; }
+.art-layer { pointer-events: none; }
+.art-segment {
+  fill: none;
+  stroke-width: 1.9px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.art-ring { opacity: 0.88; }
+.is-art-revealing .art-ring {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: art-arrive 1150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--ring-delay);
+}
+@keyframes art-arrive {
+  from { opacity: 0; transform: rotate(-9deg) scale(0.94); }
+  to { opacity: 0.88; transform: rotate(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-art-revealing .art-ring { animation: none; }
+}

@@ -35,7 +35,7 @@
   let threeFingerGestureActive = false;
   let clearCurrentDay = () => {};
   let dexcomConfigured = false;
-  let viewMode = "days";
+  let viewMode = "art";
   let mobileSelectedDay = null;
   let applyViewMode = () => {};
   const phoneLayout = window.matchMedia("(max-width: 580px)");
@@ -48,6 +48,8 @@
   }
 
   syncDisplayLayout();
+  if (!(roundDisplayLayout.matches || phoneLayout.matches)) viewMode = "days";
+  document.body.classList.toggle("art-view", viewMode === "art");
 
   function svgElement(name, attributes = {}) {
     const element = document.createElementNS(SVG_NS, name);
@@ -781,6 +783,52 @@
     return "quiet orbit";
   }
 
+  function artRing(day, dayIndex, cx, cy, radius, shapeGap) {
+        const layer = svgElement("g", { class: "art-ring", "aria-hidden": "true" });
+        const defs = svgElement("defs", {});
+        layer.appendChild(defs);
+        let segmentId = 0;
+        chunksFor(day).forEach(chunk => {
+          const points = shapedPoints(chunk, cx, cy, radius, shapeGap);
+          let start = points[0];
+          for (let i = 1; i < points.length; i++) {
+            const control = points[i];
+            const end = i < points.length - 1
+              ? { ...midpoint(control, points[i + 1]), value: (control.value + points[i + 1].value) / 2 }
+              : control;
+            const id = `art-${dayIndex}-${segmentId++}`;
+            const gradient = svgElement("linearGradient", {
+              id, gradientUnits: "userSpaceOnUse",
+              x1: start.x, y1: start.y, x2: end.x, y2: end.y
+            });
+            [0, 0.5, 1].forEach(t => {
+              const value = i < points.length - 1
+                ? (1 - t) ** 2 * start.value + 2 * (1 - t) * t * control.value + t ** 2 * end.value
+                : start.value + (end.value - start.value) * t;
+              gradient.appendChild(svgElement("stop", { offset: t, "stop-color": SugarOrbitPalette.color(value) }));
+            });
+            defs.appendChild(gradient);
+            const d = `M${start.x.toFixed(2)},${start.y.toFixed(2)}` + (i < points.length - 1
+              ? ` Q${control.x.toFixed(2)},${control.y.toFixed(2)} ${end.x.toFixed(2)},${end.y.toFixed(2)}`
+              : ` L${end.x.toFixed(2)},${end.y.toFixed(2)}`);
+            layer.appendChild(svgElement("path", { d, stroke: `url(#${id})`, class: "art-segment" }));
+            start = end;
+          }
+        });
+        layer.style.setProperty("--ring-delay", `${dayIndex * 75}ms`);
+        return layer;
+  }
+
+  let revealTimer;
+  function revealArt() {
+    if (viewMode !== "art" || !introVortex.hidden) return;
+    stage.classList.remove("is-art-revealing");
+    void stage.offsetWidth;
+    stage.classList.add("is-art-revealing");
+    window.clearTimeout(revealTimer);
+    revealTimer = window.setTimeout(() => stage.classList.remove("is-art-revealing"), 1800);
+  }
+
   function draw() {
     if (!currentProfile) return;
     const width = Math.max(280, Math.min(720, stage.clientWidth));
@@ -816,7 +864,9 @@
     svg.append(title, description, interactionBackdrop);
     const daysLayer = svgElement("g", { class: "view-layer days-layer" });
     const patternsLayer = svgElement("g", { class: "view-layer patterns-layer" });
-    svg.append(daysLayer, patternsLayer);
+    const artLayer = svgElement("g", { class: "view-layer art-layer" });
+    let artBuilt = false;
+    svg.append(artLayer, daysLayer, patternsLayer);
 
     const clockLabels = [
       { angle: -Math.PI / 2, label: "night", anchor: "middle", dx: 0, dy: 4 },
@@ -1205,6 +1255,15 @@
     };
 
     applyViewMode = () => {
+      const showArt = viewMode === "art";
+      document.body.classList.toggle("art-view", showArt);
+      if (showArt && !artBuilt) {
+        currentProfile.days.forEach((day, index) => {
+          artLayer.appendChild(artRing(day, index, cx, cy, innerRadius + index * gap, shapeGap));
+        });
+        artBuilt = true;
+      }
+      artLayer.classList.toggle("is-hidden", !showArt);
       const showDays = viewMode === "days";
       const showPatterns = viewMode === "patterns";
       activeDay = null;
@@ -1246,6 +1305,10 @@
   }
 
   function beginIntro() {
+    if (viewMode === "art") {
+      introVortex.hidden = true;
+      return Promise.resolve();
+    }
     mobileOrbitControls.hidden = true;
     introVortex.classList.remove("is-leaving");
     introConnect.hidden = false;
@@ -1259,6 +1322,7 @@
   }
 
   function beginCurveIntro() {
+    if (viewMode === "art") return Promise.resolve();
     const width = Math.max(280, Math.min(720, stage.clientWidth));
     drawIntroData(width, width);
     introCurves.hidden = false;
@@ -1277,6 +1341,7 @@
     introConnect.classList.remove("is-leaving");
     introCurves.classList.remove("is-active");
     introCurves.hidden = true;
+    revealArt();
   }
 
   async function fetchJSON(url, options) {
@@ -1327,11 +1392,12 @@
   }
 
   async function initialize() {
-    renderSample();
     const connectMinimum = beginIntro();
     try {
       const status = await fetchJSON("/api/status");
       if (!status.configured) {
+        viewMode = "days";
+        renderSample();
         statusText.textContent = "Dexcom Share setup needed";
         showMessage("Add your private Dexcom Share username and password to .env, then restart Sugar Orbits.");
         return;
@@ -1342,6 +1408,10 @@
       statusText.textContent = "App unavailable";
       showMessage(error.message, true);
     } finally {
+      if (!currentProfile) {
+        viewMode = "days";
+        renderSample();
+      }
       await connectMinimum;
       await beginCurveIntro();
       endIntro();
@@ -1381,8 +1451,17 @@
     option.addEventListener("click", () => {
       viewMode = option.dataset.view || "days";
       applyViewMode();
+      revealArt();
     });
   });
+
+  let lastInteraction = performance.now();
+  document.addEventListener("pointerdown", () => {
+    const idleFor = performance.now() - lastInteraction;
+    lastInteraction = performance.now();
+    if (idleFor >= 120000) revealArt();
+  }, { capture: true, passive: true });
+  document.addEventListener("pointermove", () => { lastInteraction = performance.now(); }, { passive: true });
 
   let swipeStart = null;
   const activeTouchPoints = new Map();
@@ -1485,10 +1564,13 @@
     const elapsed = performance.now() - swipeStart.time;
     swipeStart = null;
     if (elapsed > 900 || Math.abs(deltaX) < 54 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
-    const nextMode = deltaX < 0 ? "patterns" : "days";
+    const modes = ["art", "days", "patterns"];
+    const nextIndex = Math.max(0, Math.min(modes.length - 1, modes.indexOf(viewMode) + (deltaX < 0 ? 1 : -1)));
+    const nextMode = modes[nextIndex];
     if (nextMode === viewMode) return;
     viewMode = nextMode;
     applyViewMode();
+    revealArt();
     if (navigator.vibrate) navigator.vibrate(12);
   });
   stage.addEventListener("pointercancel", () => {
@@ -1496,6 +1578,15 @@
   });
 
   window.addEventListener("keydown", event => {
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const modes = ["art", "days", "patterns"];
+      const index = Math.max(0, Math.min(2, modes.indexOf(viewMode) + (event.key === "ArrowRight" ? 1 : -1)));
+      viewMode = modes[index];
+      applyViewMode();
+      revealArt();
+      event.preventDefault();
+    }
     if (event.key === "PageDown") showHistoryPeriod(currentPeriodOffset + 1);
     if (event.key === "PageUp") showHistoryPeriod(currentPeriodOffset - 1);
   });

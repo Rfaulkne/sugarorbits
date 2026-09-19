@@ -240,6 +240,7 @@ class AppHandler(BaseHTTPRequestHandler):
         static_routes = {
             "/": ("index.html", "text/html; charset=utf-8"),
             "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+            "/orbit-palette.js": ("orbit-palette.js", "text/javascript; charset=utf-8"),
             "/app.js": ("app.js", "text/javascript; charset=utf-8"),
             "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json; charset=utf-8"),
             "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),

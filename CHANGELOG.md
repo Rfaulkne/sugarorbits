@@ -1,5 +1,15 @@
 # Sugar Orbits version history
 
+## 0.3.0 — 2026-09-19
+
+- Add a text-free art face as the default on round displays and phones. Desktop starts in detail with an Art button.
+- Restore the spectrum prototype palette, driven by glucose values along the same seven daily profiles; missing intervals remain gaps.
+- Swipe left through Art → Seven days → Trends; swipe right to return. Multi-touch history stays separate. Arrow keys provide desktop navigation.
+- Add a brief staggered reveal on initial art load, entering Art, and a touch after two minutes without interaction. No continuous art animation; reduced-motion preference is respected.
+- Error/status messages remain accessible in the detail views. Startup without data falls back to the labelled sample/detail view instead of displaying sample data as unlabeled art.
+- Preserve v0.2.0 at archive/v0.2.0-round-swipe.
+- Validation: 10 Python tests; JavaScript syntax; art path geometry, missing-data gaps, palette and three-view gesture checks pass. Browser installation was unavailable in the development environment; visual quality, Pi performance, and wake reveal still need physical-device confirmation.
+
 ## 0.2.0 — 2026-09-19
 
 - Enable one-finger horizontal swipes on the round Pi display: left opens average/trends, right returns to seven days.

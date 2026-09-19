@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/app-icon-180.png">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="art-view">
   <div class="app-shell">
     <header class="app-head">
       <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Sugar Orbits</div>
@@ -28,7 +28,8 @@
     <main>
       <section class="portrait" aria-label="Four-week glucose history shown as seven-day radial portraits">
         <nav class="view-nav" aria-label="Glucose views">
-          <button class="view-option is-active" type="button" data-view="days">daily orbit</button>
+          <button class="view-option is-active" type="button" data-view="art">art</button>
+          <button class="view-option" type="button" data-view="days">daily orbit</button>
           <button class="view-option" type="button" data-view="patterns">trends</button>
         </nav>
         <div class="portrait-period">
@@ -80,6 +81,7 @@
       <span id="freshness" class="freshness">preview data</span>
     </footer>
   </div>
+  <script src="/orbit-palette.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>
