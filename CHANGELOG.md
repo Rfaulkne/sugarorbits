@@ -1,5 +1,13 @@
 # Sugar Orbits version history
 
+## 0.9.0 — 2026-09-20
+
+- Make the Art home screen monochrome with fixed, faint-grey glucose curves.
+- Replace coloured moving trims with exactly one neutral orbiting dot per daily curve.
+- Run each dot along the day's longest uninterrupted real-data section so missing Dexcom intervals are not visually bridged.
+- Stagger dot phase and speed across the seven rings; remove scaling and rotation from the home reveal as well as its idle state.
+- Preserve archive/v0.8.0-moving-trims before this change.
+
 ## 0.8.0 — 2026-09-20
 
 - Replace Art's orbital tide with stationary data geometry and a clockwise path-trim animation.

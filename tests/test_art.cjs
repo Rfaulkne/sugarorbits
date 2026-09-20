@@ -16,25 +16,21 @@ vm.runInContext(extract('  function midpoint(', '  function closedSmoothPath(') 
   extract('  function artRing(', '  let revealTimer'), context);
 const points = [{minute:0,value:3},{minute:5,value:6},{minute:10,value:12},{minute:80,value:5},{minute:85,value:7}];
 const ring=context.artRing(points,0,360,363,200,10);
-const paths=ring.children.find(n=>n.attrs.mask).children.filter(n=>n.tag==='path');
-const mask=ring.children[0].children.find(n=>n.tag==='mask');
-const trimMask=ring.children[0].children.filter(n=>n.tag==='mask')[1];
-assert.equal(mask.children.length,2,'Each continuous data chunk gets one smooth silhouette');
-assert.equal(trimMask.children.length,2,'Each data chunk gets one moving trim without bridging gaps');
-assert.equal(trimMask.children[0].attrs.pathLength,100,'Trim motion uses normalized path length');
-assert.equal(paths.length,3,'A missing-data gap must not get a connecting segment');
 const chunks=context.chunksFor(points);
-let offset=0;
-for (const chunk of chunks) {
- const shaped=context.shapedPoints(chunk,360,363,200,10);
- const segments=paths.slice(offset,offset+chunk.length-1);
- const combined=segments[0].attrs.d + segments.slice(1).map(p=>p.attrs.d.replace(/^M[^ ]+/, '')).join('');
- assert.equal(combined,context.smoothPath(shaped),'Art must preserve the detail curve geometry');
- offset+=chunk.length-1;
-}
+const lines=ring.children.filter(n=>n.attrs.class==='art-orbit-line');
+const dots=ring.children.filter(n=>n.attrs.class==='art-orbit-dot');
+assert.equal(lines.length,2,'Missing data stays split into separate grey paths');
+assert.equal(dots.length,1,'Each daily ring gets exactly one orbiting dot');
+assert.equal(dots[0].attrs.pathLength,100,'Dot motion uses normalized path length');
+chunks.forEach((chunk,index)=>assert.equal(
+ lines[index].attrs.d,
+ context.smoothPath(context.shapedPoints(chunk,360,363,200,10)),
+ 'Art must preserve detail curve geometry'
+));
+assert.equal(dots[0].attrs.d,lines[0].attrs.d,'Dot follows the longest uninterrupted real-data path');
 assert.notEqual(palette.color(3),palette.color(13));
 assert.equal(palette.color(6.4),'rgb(207,199,225)');
-assert.equal(context.artRing([],1,360,363,200,10).children.find(n=>n.attrs.mask).children.length,0);
+assert.equal(context.artRing([],1,360,363,200,10).children.length,0);
 assert.ok(Math.abs(context.minuteFromCartesian(0,-1,0,0)-0)<0.001,'Top is midnight');
 assert.ok(Math.abs(context.minuteFromCartesian(1,0,0,0)-360)<0.001,'Right is 06:00');
 assert.ok(Math.abs(context.minuteFromCartesian(0,1,0,0)-720)<0.001,'Bottom is noon');
@@ -45,10 +41,12 @@ assert.equal(context.nearestTimedPoint(timed,680),null,'Probe does not invent a 
 assert.match(source,/TIME IN RANGE · \$\{Math\.round\(dayTimeInRange\)\}%/,'Probe keeps daily time in range visible');
 assert.match(source,/moved > 14/,'Shutdown hold cancels on finger movement');
 assert.match(source,/\}, 3000\);/,'Shutdown title requires a three-second hold');
-assert.match(styles,/@keyframes art-trim-orbit/,'Art uses moving path trims');
+assert.match(styles,/@keyframes art-dot-orbit/,'Art uses orbiting dots');
+assert.match(styles,/\.art-orbit-line[^}]*rgba\(241, 244, 237, 0\.18\)/s,'Home paths are faint neutral grey');
 assert.match(styles,/\.trend-range-glow/,'Trend range markers include an orbiting glow');
 assert.doesNotMatch(styles,/@keyframes orbit-breathe/,'Whole-wheel breathing is removed');
 assert.doesNotMatch(styles,/@keyframes orbital-tide/,'Ring scaling tide is removed');
+assert.doesNotMatch(styles,/@keyframes art-trim-orbit/,'Moving trim animation is removed');
 const listeners={};let now=0,changes=0;
 Object.assign(context,{
  stage:{addEventListener:(n,f)=>(listeners[n]??=[]).push(f),classList:{add(){},remove(){}}},

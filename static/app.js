@@ -886,76 +886,30 @@
   }
 
   function artRing(day, dayIndex, cx, cy, radius, shapeGap) {
-        const layer = svgElement("g", { class: "art-ring", "aria-hidden": "true" });
-        const defs = svgElement("defs", {});
-        layer.appendChild(defs);
-        const mask = svgElement("mask", {
-          id: `art-mask-${dayIndex}`, maskUnits: "userSpaceOnUse",
-          x: 0, y: 0, width: cx * 2, height: cx * 2
-        });
-        const trimMask = svgElement("mask", {
-          id: `art-trim-mask-${dayIndex}`, maskUnits: "userSpaceOnUse",
-          x: 0, y: 0, width: cx * 2, height: cx * 2
-        });
-        defs.appendChild(mask);
-        defs.appendChild(trimMask);
-        const colors = svgElement("g", { mask: `url(#art-mask-${dayIndex})` });
-        const trimColors = svgElement("g", {
-          mask: `url(#art-trim-mask-${dayIndex})`,
-          class: "art-trim-colors"
-        });
-        layer.appendChild(colors);
-        layer.appendChild(trimColors);
-        let segmentId = 0;
-        chunksFor(day).forEach(chunk => {
-          const points = shapedPoints(chunk, cx, cy, radius, shapeGap);
-          // One continuous silhouette per data chunk avoids a scalloped edge
-          // from hundreds of independently capped gradient strokes.
-          mask.appendChild(svgElement("path", {
-            d: smoothPath(points), fill: "none", stroke: "white",
-            "stroke-width": 1.9, "stroke-linecap": "round", "stroke-linejoin": "round"
-          }));
-          trimMask.appendChild(svgElement("path", {
-            d: smoothPath(points),
-            fill: "none",
-            stroke: "white",
-            "stroke-width": 4,
-            "stroke-linecap": "round",
-            "stroke-linejoin": "round",
-            pathLength: 100,
-            class: "art-trim-mask-path"
-          }));
-          let start = points[0];
-          for (let i = 1; i < points.length; i++) {
-            const control = points[i];
-            const end = i < points.length - 1
-              ? { ...midpoint(control, points[i + 1]), value: (control.value + points[i + 1].value) / 2 }
-              : control;
-            const id = `art-${dayIndex}-${segmentId++}`;
-            const gradient = svgElement("linearGradient", {
-              id, gradientUnits: "userSpaceOnUse",
-              x1: start.x, y1: start.y, x2: end.x, y2: end.y
-            });
-            [0, 0.5, 1].forEach(t => {
-              const value = i < points.length - 1
-                ? (1 - t) ** 2 * start.value + 2 * (1 - t) * t * control.value + t ** 2 * end.value
-                : start.value + (end.value - start.value) * t;
-              gradient.appendChild(svgElement("stop", { offset: t, "stop-color": SugarOrbitPalette.color(value) }));
-            });
-            defs.appendChild(gradient);
-            const d = `M${start.x.toFixed(2)},${start.y.toFixed(2)}` + (i < points.length - 1
-              ? ` Q${control.x.toFixed(2)},${control.y.toFixed(2)} ${end.x.toFixed(2)},${end.y.toFixed(2)}`
-              : ` L${end.x.toFixed(2)},${end.y.toFixed(2)}`);
-            const attributes = { d, stroke: `url(#${id})`, class: "art-segment" };
-            colors.appendChild(svgElement("path", attributes));
-            trimColors.appendChild(svgElement("path", attributes));
-            start = end;
-          }
-        });
-        layer.style.setProperty("--ring-delay", `${dayIndex * 75}ms`);
-        layer.style.setProperty("--trim-delay", `${dayIndex * -1.7}s`);
-        layer.style.setProperty("--trim-duration", `${17 + dayIndex * 0.55}s`);
-        return layer;
+    const layer = svgElement("g", { class: "art-ring", "aria-hidden": "true" });
+    const shapedChunks = chunksFor(day).map(chunk => (
+      shapedPoints(chunk, cx, cy, radius, shapeGap)
+    ));
+    shapedChunks.forEach(points => {
+      layer.appendChild(svgElement("path", {
+        d: smoothPath(points),
+        class: "art-orbit-line"
+      }));
+    });
+    const longestChunk = shapedChunks.reduce((longest, points) => (
+      points.length > longest.length ? points : longest
+    ), []);
+    if (longestChunk.length > 1) {
+      layer.appendChild(svgElement("path", {
+        d: smoothPath(longestChunk),
+        class: "art-orbit-dot",
+        pathLength: 100
+      }));
+    }
+    layer.style.setProperty("--ring-delay", `${dayIndex * 75}ms`);
+    layer.style.setProperty("--dot-delay", `${dayIndex * -1.9}s`);
+    layer.style.setProperty("--dot-duration", `${14.5 + dayIndex * 0.75}s`);
+    return layer;
   }
 
   let revealTimer;

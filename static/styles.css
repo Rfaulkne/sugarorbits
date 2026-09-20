@@ -1103,41 +1103,39 @@ body.round-display {
 .art-view .radial-svg > text:not(.center-brand) { display: none !important; }
 .art-view .intro-vortex { display: none !important; }
 .art-layer { pointer-events: none; }
-.art-segment {
+.art-orbit-line,
+.art-orbit-dot {
   fill: none;
-  stroke-width: 5px;
   stroke-linecap: round;
   stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
-.art-ring {
-  opacity: 0.88;
+.art-orbit-line {
+  stroke: rgba(241, 244, 237, 0.18);
+  stroke-width: 1.15;
 }
-.art-trim-colors {
-  opacity: 0.98;
-}
-.art-trim-mask-path {
-  stroke-dasharray: 11 89;
+.art-orbit-dot {
+  stroke: rgba(241, 244, 237, 0.86);
+  stroke-width: 5;
+  stroke-dasharray: 0.12 99.88;
   stroke-dashoffset: 0;
-  animation: art-trim-orbit var(--trim-duration) linear infinite;
-  animation-delay: var(--trim-delay);
+  animation: art-dot-orbit var(--dot-duration) linear infinite;
+  animation-delay: var(--dot-delay);
 }
 .is-art-revealing .art-ring {
-  transform-box: view-box;
-  transform-origin: center;
-  animation: art-arrive 1150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: art-arrive 900ms ease-out both;
   animation-delay: var(--ring-delay);
 }
 @keyframes art-arrive {
-  from { opacity: 0; transform: rotate(-9deg) scale(0.94); }
-  to { opacity: 0.88; transform: rotate(0) scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-@keyframes art-trim-orbit {
+@keyframes art-dot-orbit {
   to { stroke-dashoffset: -100; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .is-art-revealing .art-ring,
-  .art-ring { animation: none; opacity: 0.88; }
-  .art-trim-mask-path { animation: none; }
+  .is-art-revealing .art-ring { animation: none; opacity: 1; }
+  .art-orbit-dot { animation: none; }
   .trend-range-glow { animation: none; }
 }
 
@@ -1252,7 +1250,7 @@ body.round-display {
   font-size: 19px;
   letter-spacing: 0.045em;
 }
-.art-motion-paused .art-trim-mask-path,
-.art-layer.is-hidden .art-trim-mask-path {
+.art-motion-paused .art-orbit-dot,
+.art-layer.is-hidden .art-orbit-dot {
   animation-play-state: paused;
 }
