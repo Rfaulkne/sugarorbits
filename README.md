@@ -2,6 +2,8 @@
 
 **Using the installed Pi? See the [PowerShell command guide](POWERSHELL_README.md)** for connecting, updating, restarting, screen controls and safe shutdown.
 
+Building the round unit or designing its enclosure? See the **[hardware BOM and mechanical references](docs/HARDWARE_BOM.md)**.
+
 Sugar Orbits turns four rolling weeks of personal Dexcom G7 readings into
 artistic seven-day radial glucose portraits. Each orbit is one day, time runs
 clockwise, and the glucose curve deforms the ring. The Trends view reveals
