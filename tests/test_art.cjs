@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const palette = require('../static/orbit-palette.js');
 const source = fs.readFileSync(require.resolve('../static/app.js'), 'utf8');
+const styles = fs.readFileSync(require.resolve('../static/styles.css'), 'utf8');
 function extract(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
 const context = {
   SugarOrbitPalette: palette, TARGET_MMOL: 6.4,
@@ -38,6 +39,12 @@ assert.ok(Math.abs(context.minuteFromCartesian(-1,0,0,0)-1080)<0.001,'Left is 18
 const timed=[{minute:5,value:5.8},{minute:720,value:8.2}];
 assert.equal(context.nearestTimedPoint(timed,1438),timed[0],'Probe wraps cleanly around midnight');
 assert.equal(context.nearestTimedPoint(timed,680),null,'Probe does not invent a reading across a gap');
+assert.match(source,/TIME IN RANGE · \$\{Math\.round\(dayTimeInRange\)\}%/,'Probe keeps daily time in range visible');
+assert.match(source,/moved > 14/,'Shutdown hold cancels on finger movement');
+assert.match(source,/\}, 3000\);/,'Shutdown title requires a three-second hold');
+assert.match(styles,/@keyframes orbital-tide/,'Art uses the orbital tide motion');
+assert.match(styles,/\.trend-range-glow/,'Trend range markers include an orbiting glow');
+assert.doesNotMatch(styles,/@keyframes orbit-breathe/,'Whole-wheel breathing is removed');
 const listeners={};let now=0,changes=0;
 Object.assign(context,{
  stage:{addEventListener:(n,f)=>(listeners[n]??=[]).push(f),classList:{add(){},remove(){}}},

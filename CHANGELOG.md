@@ -1,5 +1,13 @@
 # Sugar Orbits version history
 
+## 0.7.0 — 2026-09-20
+
+- Replace whole-wheel breathing with a staggered orbital tide: a subtle opacity and 0.7% scale wave travels between individual Art rings without changing their data geometry.
+- Keep the selected day's time in range visible beneath the recorded glucose value and time during press-and-drag exploration.
+- Require a stationary three-second title hold before opening safe shutdown; movement beyond 14 pixels cancels it so screen swipes do not trigger the dialog.
+- Strengthen the 3.9 and 10.0 mmol/L Trends references and add separate slow orbiting purple highlights, with reduced-motion fallback.
+- Preserve archive/v0.6.0-touch-probe before this change.
+
 ## 0.6.0 — 2026-09-20
 
 - Add a press-and-drag probe to Seven days: angle follows time, radial movement follows the visible day trace, and the center reports the nearest real Dexcom timestamp and value. Releasing restores the complete week.

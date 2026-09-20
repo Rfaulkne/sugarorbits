@@ -931,6 +931,7 @@
           }
         });
         layer.style.setProperty("--ring-delay", `${dayIndex * 75}ms`);
+        layer.style.setProperty("--tide-delay", `${dayIndex * -1.35}s`);
         return layer;
   }
 
@@ -980,8 +981,8 @@
     const daysLayer = svgElement("g", { class: "view-layer days-layer" });
     const patternsLayer = svgElement("g", { class: "view-layer patterns-layer" });
     const artLayer = svgElement("g", { class: "view-layer art-layer" });
-    const artBreathing = svgElement("g", { class: "art-breathing" });
-    artLayer.appendChild(artBreathing);
+    const artMotion = svgElement("g", { class: "art-motion" });
+    artLayer.appendChild(artMotion);
     let artBuilt = false;
     svg.append(artLayer, daysLayer, patternsLayer);
 
@@ -1144,6 +1145,16 @@
       summaryLayer.appendChild(svgElement("path", {
         d: closedSmoothPath(trendHighReference),
         class: "trend-range-reference is-high"
+      }));
+      summaryLayer.appendChild(svgElement("path", {
+        d: closedSmoothPath(trendLowReference),
+        class: "trend-range-glow is-low",
+        pathLength: 100
+      }));
+      summaryLayer.appendChild(svgElement("path", {
+        d: closedSmoothPath(trendHighReference),
+        class: "trend-range-glow is-high",
+        pathLength: 100
       }));
     }
     summaryLayer.appendChild(svgElement("circle", {
@@ -1309,6 +1320,10 @@
     };
     const showPointProbe = (index, minute) => {
       selectDay(index);
+      const dayTimeInRange = timeInRangeForDay(currentProfile.days[index]);
+      const timeInRangeLabel = Number.isFinite(dayTimeInRange)
+        ? `TIME IN RANGE · ${Math.round(dayTimeInRange)}%`
+        : "TIME IN RANGE · —";
       const point = nearestTimedPoint(currentProfile.days[index], minute);
       if (!point) {
         probeMarker.setAttribute("visibility", "hidden");
@@ -1316,7 +1331,7 @@
         centerValueText.textContent = "—";
         centerUnitText.textContent = "NO READING";
         centerLabelText.textContent = `${formatDate(currentProfile.dates[index]).toUpperCase()} · ${formatClock(Math.round(minute))}`;
-        centerTrendText.textContent = "";
+        centerTrendText.textContent = timeInRangeLabel;
         centerPeriodText.textContent = "";
         return;
       }
@@ -1331,7 +1346,7 @@
       centerValueText.textContent = point.value.toFixed(1);
       centerUnitText.textContent = "MMOL/L";
       centerLabelText.textContent = `${formatDate(currentProfile.dates[index]).toUpperCase()} · ${formatClock(point.minute)}`;
-      centerTrendText.textContent = "";
+      centerTrendText.textContent = timeInRangeLabel;
       centerPeriodText.textContent = "";
     };
     const clearDay = () => {
@@ -1433,10 +1448,12 @@
     };
     let shutdownHoldTimer = null;
     let shutdownHoldPointer = null;
+    let shutdownHoldOrigin = null;
     const cancelShutdownHold = () => {
       if (shutdownHoldTimer) window.clearTimeout(shutdownHoldTimer);
       shutdownHoldTimer = null;
       shutdownHoldPointer = null;
+      shutdownHoldOrigin = null;
       shutdownTitleHit.classList.remove("is-holding");
     };
     const pointerDistanceFromCenter = event => {
@@ -1450,15 +1467,19 @@
       if (pointerDistanceFromCenter(event) > innerRadius * 0.68) return;
       cancelShutdownHold();
       shutdownHoldPointer = event.pointerId;
+      shutdownHoldOrigin = { x: event.clientX, y: event.clientY };
       shutdownTitleHit.classList.add("is-holding");
       shutdownHoldTimer = window.setTimeout(() => {
         cancelShutdownHold();
         showShutdownDialog();
-      }, 1800);
+      }, 3000);
     };
     const trackShutdownHold = event => {
       if (event.pointerId !== shutdownHoldPointer) return;
-      if (pointerDistanceFromCenter(event) > innerRadius * 0.75) cancelShutdownHold();
+      const moved = shutdownHoldOrigin
+        ? Math.hypot(event.clientX - shutdownHoldOrigin.x, event.clientY - shutdownHoldOrigin.y)
+        : Infinity;
+      if (moved > 14 || pointerDistanceFromCenter(event) > innerRadius * 0.75) cancelShutdownHold();
     };
     stage.onpointermove = event => {
       handleOrbitPointer(event);
@@ -1494,7 +1515,7 @@
       centerBrand.setAttribute("dominant-baseline", showArt ? "middle" : "auto");
       if (showArt && !artBuilt) {
         currentProfile.days.forEach((day, index) => {
-          artBreathing.appendChild(artRing(day, index, cx, cy, innerRadius + index * gap, shapeGap));
+          artMotion.appendChild(artRing(day, index, cx, cy, innerRadius + index * gap, shapeGap));
         });
         artBuilt = true;
       }

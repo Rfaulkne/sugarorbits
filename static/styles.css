@@ -622,6 +622,7 @@ button, a { font: inherit; }
 .trend-target-orbit,
 .trend-mean-orbit,
 .trend-range-reference,
+.trend-range-glow,
 .trend-summary-profile,
 .trend-summary-arc {
   fill: none;
@@ -684,13 +685,33 @@ button, a { font: inherit; }
 }
 
 .trend-range-reference {
-  stroke: rgba(184, 167, 217, 0.22);
-  stroke-dasharray: 2 7;
-  stroke-width: 0.85;
+  stroke: rgba(184, 167, 217, 0.4);
+  stroke-dasharray: 2 6;
+  stroke-width: 1.05;
 }
 
-.trend-range-reference.is-low { opacity: 0.72; }
-.trend-range-reference.is-high { opacity: 0.9; }
+.trend-range-reference.is-low { opacity: 0.76; }
+.trend-range-reference.is-high { opacity: 0.92; }
+
+.trend-range-glow {
+  stroke: rgba(218, 199, 239, 0.9);
+  stroke-dasharray: 9 91;
+  stroke-width: 2.6;
+  filter: drop-shadow(0 0 4px rgba(184, 167, 217, 0.72));
+  transform-box: view-box;
+  transform-origin: center;
+  animation: reference-orbit 11s linear infinite;
+}
+
+.trend-range-glow.is-low {
+  opacity: 0.75;
+  animation-duration: 13s;
+  animation-direction: reverse;
+}
+
+@keyframes reference-orbit {
+  to { transform: rotate(360deg); }
+}
 
 .trend-summary-profile {
   stroke: rgba(241, 244, 237, 0.32);
@@ -1088,7 +1109,13 @@ body.round-display {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.art-ring { opacity: 0.88; }
+.art-ring {
+  opacity: 0.78;
+  transform-box: view-box;
+  transform-origin: center;
+  animation: orbital-tide 16s ease-in-out infinite;
+  animation-delay: var(--tide-delay);
+}
 .is-art-revealing .art-ring {
   transform-box: view-box;
   transform-origin: center;
@@ -1099,8 +1126,16 @@ body.round-display {
   from { opacity: 0; transform: rotate(-9deg) scale(0.94); }
   to { opacity: 0.88; transform: rotate(0) scale(1); }
 }
+@keyframes orbital-tide {
+  0%, 100% { opacity: 0.74; transform: scale(0.998); }
+  38% { opacity: 0.82; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.007); }
+  64% { opacity: 0.84; transform: scale(1.001); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .is-art-revealing .art-ring { animation: none; }
+  .is-art-revealing .art-ring,
+  .art-ring { animation: none; opacity: 0.88; }
+  .trend-range-glow { animation: none; }
 }
 
 .center-brand {
@@ -1122,7 +1157,7 @@ body.round-display {
 }
 .shutdown-title-hit.is-holding {
   stroke: rgba(184, 154, 211, 0.42);
-  animation: shutdown-arm 1.8s linear both;
+  animation: shutdown-arm 3s linear both;
 }
 @keyframes shutdown-arm {
   from { stroke-dasharray: 0 1000; }
@@ -1214,23 +1249,7 @@ body.round-display {
   font-size: 19px;
   letter-spacing: 0.045em;
 }
-.art-breathing {
-  transform-box: view-box;
-  transform-origin: center;
-  animation: orbit-breathe 8.6s linear infinite;
-}
-@keyframes orbit-breathe {
-  0%, 18% { transform: scale(1); }
-  54% { transform: scale(1.008); }
-  68% { transform: scale(1.03); }
-  73% { transform: scale(1.004); }
-  78% { transform: scale(1.016); }
-  85%, 100% { transform: scale(1); }
-}
-.art-motion-paused .art-breathing,
-.art-layer.is-hidden .art-breathing {
+.art-motion-paused .art-ring,
+.art-layer.is-hidden .art-ring {
   animation-play-state: paused;
-}
-@media (prefers-reduced-motion: reduce) {
-  .art-breathing { animation: none; }
 }
