@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import ipaddress
 import os
 import socket
+import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -19,6 +22,7 @@ from glucose_store import GlucoseStore
 
 PROJECT_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PROJECT_DIR / "static"
+POWEROFF_COMMAND = ("/usr/bin/sudo", "-n", "/usr/bin/systemctl", "poweroff")
 
 
 def load_local_env(path: Path) -> None:
@@ -35,6 +39,30 @@ def load_local_env(path: Path) -> None:
 load_local_env(PROJECT_DIR / ".env")
 
 
+def env_enabled(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def is_loopback_address(address: str) -> bool:
+    try:
+        parsed = ipaddress.ip_address(address.split("%", 1)[0])
+    except ValueError:
+        return False
+    if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped:
+        parsed = parsed.ipv4_mapped
+    return parsed.is_loopback
+
+
+def execute_poweroff() -> None:
+    time.sleep(1.0)
+    subprocess.run(
+        POWEROFF_COMMAND,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
     host: str
@@ -48,6 +76,7 @@ class Settings:
     dexcom_poll_seconds: int
     app_access_code: str
     app_session_secret: str
+    allow_system_shutdown: bool
 
     @property
     def configured(self) -> bool:
@@ -75,6 +104,7 @@ def read_settings() -> Settings:
         dexcom_poll_seconds=max(60, int(os.getenv("DEXCOM_POLL_SECONDS", "300"))),
         app_access_code=os.getenv("APP_ACCESS_CODE", ""),
         app_session_secret=os.getenv("APP_SESSION_SECRET", ""),
+        allow_system_shutdown=env_enabled("ALLOW_SYSTEM_SHUTDOWN"),
     )
 
 
@@ -129,7 +159,7 @@ def fetch_cached_glucose(days: int) -> dict[str, Any]:
 
 
 class AppHandler(BaseHTTPRequestHandler):
-    server_version = "SugarOrbits/0.3"
+    server_version = "SugarOrbits/0.5"
 
     def log_message(self, format: str, *args: object) -> None:
         print(f"{self.address_string()} - {self.command} {urlsplit(self.path).path}")
@@ -203,6 +233,11 @@ class AppHandler(BaseHTTPRequestHandler):
             cookie.value, SETTINGS.app_session_secret
         )
 
+    def _local_power_control_allowed(self) -> bool:
+        return SETTINGS.allow_system_shutdown and is_loopback_address(
+            self.client_address[0]
+        )
+
     def _read_form(self) -> dict[str, list[str]]:
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
@@ -261,6 +296,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     "source": "dexcom-share",
                     "region": SETTINGS.dexcom_share_region,
                     "pollSeconds": SETTINGS.dexcom_poll_seconds,
+                    "shutdownEnabled": self._local_power_control_allowed(),
                 }
             )
             self._json(200, status)
@@ -306,6 +342,37 @@ class AppHandler(BaseHTTPRequestHandler):
                 self._json(200, {"synced": True, "updatedReadings": changed})
             except DexcomShareError as exc:
                 self._json(502, {"error": "dexcom_share_error", "message": str(exc)})
+            return
+        if parsed.path == "/api/poweroff":
+            if not SETTINGS.allow_system_shutdown:
+                self._json(
+                    503,
+                    {
+                        "error": "shutdown_disabled",
+                        "message": "Screen shutdown is not installed on this device.",
+                    },
+                )
+                return
+            if not is_loopback_address(self.client_address[0]):
+                self._json(
+                    403,
+                    {
+                        "error": "local_only",
+                        "message": "Power-off is available only on the Pi screen.",
+                    },
+                )
+                return
+            if self.headers.get("X-Sugar-Orbits-Action") != "poweroff":
+                self._json(
+                    403,
+                    {
+                        "error": "confirmation_required",
+                        "message": "Use the hold-to-confirm control on the Pi screen.",
+                    },
+                )
+                return
+            self._json(202, {"accepted": True})
+            threading.Thread(target=execute_poweroff, daemon=True).start()
             return
         self._json(404, {"error": "not_found"})
 

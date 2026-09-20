@@ -30,6 +30,20 @@ If you already see `rob@sugarorbits:~ $`, you are connected and can skip this st
 
 ## Safely shut down before unplugging
 
+### From the round screen
+
+If screen shutdown has been installed, hold the centered **Sugar Orbits** title for about two seconds. Then hold the round **hold to power off** control until it fills. Wait for the screen to go black and activity to stop, then allow about 30 seconds before unplugging.
+
+Install this once after updating to version 0.5.0 or later. Run on the **Pi**:
+
+```bash
+cd ~/sugarorbits
+sudo bash scripts/install-power-control.sh
+sudo reboot
+```
+
+### From PowerShell
+
 Run in the **connected Pi terminal**:
 
 ```bash

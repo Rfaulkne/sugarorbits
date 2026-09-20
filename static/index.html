@@ -24,6 +24,19 @@
 
     <div id="app-message" class="app-message" role="status" hidden></div>
 
+    <div id="shutdown-dialog" class="shutdown-dialog" role="dialog" aria-modal="true" aria-labelledby="shutdown-title" hidden>
+      <div class="shutdown-card">
+        <p class="shutdown-kicker">SAFE POWER OFF</p>
+        <h2 id="shutdown-title">Power off Sugar Orbits?</h2>
+        <p id="shutdown-instruction" class="shutdown-instruction">Hold the circle until it fills.</p>
+        <button id="shutdown-confirm" class="shutdown-confirm" type="button">
+          <span class="shutdown-hold-fill" aria-hidden="true"></span>
+          <span class="shutdown-button-label">hold to power off</span>
+        </button>
+        <button id="shutdown-cancel" class="shutdown-cancel" type="button">cancel</button>
+      </div>
+    </div>
+
     <main>
       <section class="portrait" aria-label="Four-week glucose history shown as seven-day radial portraits">
         <div class="portrait-period">

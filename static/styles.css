@@ -1091,6 +1091,104 @@ body.round-display {
   letter-spacing: 0.06em;
   pointer-events: none;
 }
+.shutdown-title-hit {
+  fill: rgba(0, 0, 0, 0.001);
+  stroke: rgba(184, 154, 211, 0);
+  stroke-width: 2px;
+  stroke-dasharray: 3 4;
+  pointer-events: all;
+  touch-action: none;
+  transition: stroke 180ms ease;
+}
+.shutdown-title-hit.is-holding {
+  stroke: rgba(184, 154, 211, 0.42);
+  animation: shutdown-arm 1.8s linear both;
+}
+@keyframes shutdown-arm {
+  from { stroke-dasharray: 0 1000; }
+  to { stroke-dasharray: 1000 0; }
+}
+
+.shutdown-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 14%;
+  background: rgba(5, 6, 6, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  touch-action: none;
+}
+.shutdown-dialog[hidden] { display: none; }
+.shutdown-card {
+  width: min(430px, 100%);
+  text-align: center;
+  color: rgba(239, 237, 232, 0.95);
+}
+.shutdown-kicker {
+  margin: 0 0 12px;
+  color: rgba(188, 161, 212, 0.72);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+}
+.shutdown-card h2 {
+  margin: 0;
+  font-size: clamp(20px, 4vw, 30px);
+  font-weight: 400;
+}
+.shutdown-instruction {
+  min-height: 2.8em;
+  margin: 12px 0 18px;
+  color: rgba(239, 237, 232, 0.62);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.shutdown-confirm {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  overflow: hidden;
+  border: 1px solid rgba(188, 161, 212, 0.34);
+  border-radius: 50%;
+  color: rgba(239, 237, 232, 0.84);
+  background: rgba(188, 161, 212, 0.06);
+  font: inherit;
+  letter-spacing: 0.06em;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.shutdown-hold-fill {
+  position: absolute;
+  inset: 50%;
+  border-radius: inherit;
+  background: rgba(188, 161, 212, 0.2);
+  transform: translate(-50%, -50%) scale(0);
+}
+.shutdown-confirm.is-holding .shutdown-hold-fill {
+  animation: shutdown-fill 2.2s linear both;
+}
+.shutdown-confirm.is-complete .shutdown-hold-fill {
+  inset: 0;
+  transform: none;
+}
+.shutdown-button-label { position: relative; z-index: 1; font-size: 11px; }
+@keyframes shutdown-fill {
+  from { inset: 50%; transform: translate(-50%, -50%) scale(0); }
+  to { inset: 0; transform: translate(0, 0) scale(1); }
+}
+.shutdown-cancel {
+  display: block;
+  margin: 18px auto 0;
+  padding: 10px 18px;
+  border: 0;
+  color: rgba(239, 237, 232, 0.56);
+  background: transparent;
+  font: inherit;
+}
+.shutdown-cancel[hidden] { display: none; }
 .art-view .center-brand {
   fill: rgba(231, 226, 239, 0.78);
   font-size: 19px;

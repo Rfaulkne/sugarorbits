@@ -18,6 +18,10 @@
   const dayDial = document.getElementById("day-dial");
   const dayDialLabel = document.getElementById("day-dial-label");
   const dayDialAll = document.getElementById("day-dial-all");
+  const shutdownDialog = document.getElementById("shutdown-dialog");
+  const shutdownConfirm = document.getElementById("shutdown-confirm");
+  const shutdownCancel = document.getElementById("shutdown-cancel");
+  const shutdownInstruction = document.getElementById("shutdown-instruction");
   const SVG_NS = "http://www.w3.org/2000/svg";
   const HIGH_MMOL = 10.0;
   const LOW_MMOL = 3.9;
@@ -35,6 +39,8 @@
   let threeFingerGestureActive = false;
   let clearCurrentDay = () => {};
   let dexcomConfigured = false;
+  let shutdownEnabled = false;
+  let shutdownRequested = false;
   let viewMode = "art";
   let mobileSelectedDay = null;
   let applyViewMode = () => {};
@@ -42,6 +48,79 @@
   const roundDisplayLayout = window.matchMedia(
     "(min-width: 640px) and (max-width: 900px) and (min-height: 640px) and (max-height: 900px)"
   );
+
+  function showShutdownDialog() {
+    if (!shutdownEnabled || shutdownRequested) return;
+    shutdownInstruction.textContent = "Hold the circle until it fills.";
+    shutdownConfirm.disabled = false;
+    shutdownConfirm.classList.remove("is-holding", "is-complete");
+    shutdownDialog.hidden = false;
+    document.body.classList.add("shutdown-open");
+    shutdownConfirm.focus({ preventScroll: true });
+    if (navigator.vibrate) navigator.vibrate(18);
+  }
+
+  function closeShutdownDialog() {
+    if (shutdownRequested) return;
+    shutdownDialog.hidden = true;
+    document.body.classList.remove("shutdown-open");
+    shutdownConfirm.classList.remove("is-holding");
+  }
+
+  async function requestPoweroff() {
+    if (shutdownRequested) return;
+    shutdownRequested = true;
+    shutdownConfirm.classList.remove("is-holding");
+    shutdownConfirm.classList.add("is-complete");
+    shutdownConfirm.disabled = true;
+    shutdownCancel.hidden = true;
+    shutdownInstruction.textContent = "Shutting down… wait for the screen to go black, then unplug.";
+    try {
+      await fetchJSON("/api/poweroff", {
+        method: "POST",
+        headers: { "X-Sugar-Orbits-Action": "poweroff" }
+      });
+    } catch (error) {
+      shutdownRequested = false;
+      shutdownConfirm.disabled = false;
+      shutdownConfirm.classList.remove("is-complete");
+      shutdownCancel.hidden = false;
+      shutdownInstruction.textContent = error.message;
+    }
+  }
+
+  function installConfirmationHold() {
+    let timer = null;
+    let pointerId = null;
+    let origin = null;
+    const cancel = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = null;
+      pointerId = null;
+      origin = null;
+      if (!shutdownRequested) shutdownConfirm.classList.remove("is-holding");
+    };
+    shutdownConfirm.addEventListener("pointerdown", event => {
+      if (event.button !== undefined && event.button !== 0) return;
+      event.preventDefault();
+      cancel();
+      pointerId = event.pointerId;
+      origin = { x: event.clientX, y: event.clientY };
+      if (shutdownConfirm.setPointerCapture) shutdownConfirm.setPointerCapture(pointerId);
+      shutdownConfirm.classList.add("is-holding");
+      timer = window.setTimeout(requestPoweroff, 2200);
+    });
+    shutdownConfirm.addEventListener("pointermove", event => {
+      if (event.pointerId !== pointerId || !origin) return;
+      if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 22) cancel();
+    });
+    shutdownConfirm.addEventListener("pointerup", cancel);
+    shutdownConfirm.addEventListener("pointercancel", cancel);
+    shutdownConfirm.addEventListener("contextmenu", event => event.preventDefault());
+  }
+
+  installConfirmationHold();
+  shutdownCancel.addEventListener("click", closeShutdownDialog);
 
   function syncDisplayLayout() {
     document.body.classList.toggle("round-display", roundDisplayLayout.matches);
@@ -1066,6 +1145,14 @@
     }
     patternsLayer.appendChild(summaryLayer);
 
+    const shutdownTitleHit = svgElement("circle", {
+      cx,
+      cy,
+      r: Math.max(54, innerRadius * 0.58),
+      class: "shutdown-title-hit",
+      "aria-hidden": "true"
+    });
+    svg.appendChild(shutdownTitleHit);
     const centerBrand = addText(svg, cx, cy - 50, "center-brand", "middle", "Sugar Orbits");
     const centerValue = Number.isFinite(currentProfile.average) ? currentProfile.average.toFixed(1) : "—";
     const centerValueText = addText(svg, cx, cy - 7, "center-value", "middle", centerValue);
@@ -1216,13 +1303,13 @@
       }
       selectDay(candidate);
     };
-    let modeHoldTimer = null;
-    let modeHoldPointer = null;
-    const cancelModeHold = () => {
-      if (modeHoldTimer) window.clearTimeout(modeHoldTimer);
-      modeHoldTimer = null;
-      modeHoldPointer = null;
-      svg.classList.remove("is-mode-holding");
+    let shutdownHoldTimer = null;
+    let shutdownHoldPointer = null;
+    const cancelShutdownHold = () => {
+      if (shutdownHoldTimer) window.clearTimeout(shutdownHoldTimer);
+      shutdownHoldTimer = null;
+      shutdownHoldPointer = null;
+      shutdownTitleHit.classList.remove("is-holding");
     };
     const pointerDistanceFromCenter = event => {
       const transform = svg.getScreenCTM();
@@ -1233,36 +1320,33 @@
       const local = pointer.matrixTransform(transform.inverse());
       return Math.hypot(local.x - cx, local.y - cy);
     };
-    const beginModeHold = event => {
+    const beginShutdownHold = event => {
+      if (!shutdownEnabled || shutdownRequested || !shutdownDialog.hidden) return;
       if (event.button !== undefined && event.button !== 0) return;
-      if (event.pointerType === "touch") return;
       if (pointerDistanceFromCenter(event) > innerRadius * 0.68) return;
-      cancelModeHold();
-      modeHoldPointer = event.pointerId;
-      svg.classList.add("is-mode-holding");
-      modeHoldTimer = window.setTimeout(() => {
-        const modes = ["days", "patterns"];
-        viewMode = modes[(modes.indexOf(viewMode) + 1) % modes.length];
-        applyViewMode();
-        if (navigator.vibrate) navigator.vibrate(18);
-        cancelModeHold();
-      }, 680);
+      cancelShutdownHold();
+      shutdownHoldPointer = event.pointerId;
+      shutdownTitleHit.classList.add("is-holding");
+      shutdownHoldTimer = window.setTimeout(() => {
+        cancelShutdownHold();
+        showShutdownDialog();
+      }, 1800);
     };
-    const trackModeHold = event => {
-      if (event.pointerId !== modeHoldPointer) return;
-      if (pointerDistanceFromCenter(event) > innerRadius * 0.75) cancelModeHold();
+    const trackShutdownHold = event => {
+      if (event.pointerId !== shutdownHoldPointer) return;
+      if (pointerDistanceFromCenter(event) > innerRadius * 0.75) cancelShutdownHold();
     };
     stage.onpointermove = event => {
       handleOrbitPointer(event);
-      trackModeHold(event);
+      trackShutdownHold(event);
     };
     stage.onpointerdown = event => {
       handleOrbitPointer(event);
-      beginModeHold(event);
+      beginShutdownHold(event);
     };
-    stage.onpointerup = cancelModeHold;
+    stage.onpointerup = cancelShutdownHold;
     stage.onpointerleave = event => {
-      cancelModeHold();
+      cancelShutdownHold();
       if (viewMode === "days" && event.pointerType !== "touch") clearDay();
     };
     stage.onpointercancel = stage.onpointerleave;
@@ -1413,6 +1497,7 @@
     const connectMinimum = beginIntro();
     try {
       const status = await fetchJSON("/api/status");
+      shutdownEnabled = Boolean(status.shutdownEnabled);
       if (!status.configured) {
         viewMode = "days";
         renderSample();

@@ -1,5 +1,14 @@
 # Sugar Orbits version history
 
+## 0.5.0 — 2026-09-20
+
+- Add a screen-only safe shutdown flow: hold the centered title, then complete a separate hold-to-confirm action.
+- Show a clear wait-for-black-screen message before the Pi powers off. Short taps and incomplete holds cancel safely.
+- Restrict the power endpoint to the Pi's loopback browser and require an explicit private environment flag.
+- Add a one-time installer granting the app user password-free access to only `/usr/bin/systemctl poweroff`.
+- Keep swipe navigation and glucose calculations unchanged.
+- Preserve archive/v0.4.0-breathing-title before this change.
+
 ## 0.4.0 — 2026-09-19
 
 - Art rings breathe together from 100% to 103% scale over a ten-second cycle. The center title stays still.
