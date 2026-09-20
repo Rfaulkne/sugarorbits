@@ -6,13 +6,14 @@ const source = fs.readFileSync(require.resolve('../static/app.js'), 'utf8');
 const styles = fs.readFileSync(require.resolve('../static/styles.css'), 'utf8');
 function extract(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
 const context = {
-  SugarOrbitPalette: palette, TARGET_MMOL: 6.4,
+  SugarOrbitPalette: palette, TARGET_MMOL: 6.4, LOW_MMOL: 3.9, HIGH_MMOL: 10.0,
   svgElement(tag, attrs={}) { return {tag,attrs,children:[],style:{setProperty(){}},appendChild(x){this.children.push(x);}}; }
 };
 vm.createContext(context);
 vm.runInContext(extract('  function midpoint(', '  function closedSmoothPath(') +
   extract('  function chunksFor(', '  function zone(') +
   extract('  function shapedRadiusForValue(', '  function interpolatePoints(') +
+  extract('  function glucoseRangePercentages(', '  function previousPeriodTrend(') +
   extract('  function artRing(', '  let revealTimer'), context);
 const points = [{minute:0,value:3},{minute:5,value:6},{minute:10,value:12},{minute:80,value:5},{minute:85,value:7}];
 const ring=context.artRing(points,0,360,363,200,10);
@@ -38,6 +39,13 @@ assert.ok(Math.abs(context.minuteFromCartesian(-1,0,0,0)-1080)<0.001,'Left is 18
 const timed=[{minute:5,value:5.8},{minute:720,value:8.2}];
 assert.equal(context.nearestTimedPoint(timed,1438),timed[0],'Probe wraps cleanly around midnight');
 assert.equal(context.nearestTimedPoint(timed,680),null,'Probe does not invent a reading across a gap');
+const range=context.glucoseRangePercentages([[{value:3.8},{value:3.9},{value:8},{value:10},{value:10.1}]]);
+assert.equal(range.below,20,'Below range uses values strictly below 3.9');
+assert.equal(range.inRange,60,'Time in range includes both thresholds');
+assert.equal(range.above,20,'Above range uses values strictly above 10.0');
+assert.equal(context.timeInRangeForDay([]),null,'No readings produce no time-in-range claim');
+assert.match(source,/TIME IN RANGE · \$\{visibleTimeInRange\}/,'All-rings center shows weekly time in range');
+assert.match(source,/BELOW 3\.9 · ABOVE 10\.0/,'Trends center labels below and above percentages');
 assert.match(source,/TIME IN RANGE · \$\{Math\.round\(dayTimeInRange\)\}%/,'Probe keeps daily time in range visible');
 assert.match(source,/moved > 14/,'Shutdown hold cancels on finger movement');
 assert.match(source,/\}, 3000\);/,'Shutdown title requires a three-second hold');

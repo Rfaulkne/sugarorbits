@@ -725,6 +725,10 @@ button, a { font: inherit; }
 
 .center-value.is-high { fill: var(--orange); }
 .center-value.is-low { fill: var(--blue); }
+.range-share-value { font-size: 29px; }
+.range-share-low { fill: var(--blue); }
+.range-share-high { fill: var(--orange); }
+.range-share-separator { fill: rgba(241, 244, 237, 0.42); }
 
 .radial-svg.is-mode-holding .center-value,
 .radial-svg.is-mode-holding .center-unit {

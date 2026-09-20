@@ -728,10 +728,19 @@
     return profile;
   }
 
+  function glucoseRangePercentages(days) {
+    const points = days.flat().filter(point => Number.isFinite(point.value));
+    if (!points.length) return { below: null, inRange: null, above: null };
+    const count = points.length;
+    return {
+      below: points.filter(point => point.value < LOW_MMOL).length / count * 100,
+      inRange: points.filter(point => point.value >= LOW_MMOL && point.value <= HIGH_MMOL).length / count * 100,
+      above: points.filter(point => point.value > HIGH_MMOL).length / count * 100
+    };
+  }
+
   function timeInRangeForDay(points) {
-    if (!points.length) return null;
-    const inRange = points.filter(point => point.value >= LOW_MMOL && point.value <= HIGH_MMOL).length;
-    return (inRange / points.length) * 100;
+    return glucoseRangePercentages([points]).inRange;
   }
 
   function previousPeriodTrend(current, previous) {
@@ -1184,6 +1193,10 @@
     svg.appendChild(shutdownTitleHit);
     const centerBrand = addText(svg, cx, cy - 50, "center-brand", "middle", "Sugar Orbits");
     const centerValue = Number.isFinite(currentProfile.average) ? currentProfile.average.toFixed(1) : "—";
+    const visibleRange = glucoseRangePercentages(currentProfile.days);
+    const visibleTimeInRange = Number.isFinite(visibleRange.inRange)
+      ? `${Math.round(visibleRange.inRange)}%`
+      : "—";
     const centerValueText = addText(svg, cx, cy - 7, "center-value", "middle", centerValue);
     const centerUnitText = addText(svg, cx, cy + 17, "center-unit", "middle", "MMOL/L");
     const centerLabelText = addText(svg, cx, cy + 39, "center-label", "middle", currentProfile.isSample ? "SAMPLE · 7-DAY AVG" : "7-DAY AVERAGE");
@@ -1227,17 +1240,28 @@
       centerValueText.textContent = centerValue;
       centerUnitText.textContent = "MMOL/L";
       centerLabelText.textContent = currentProfile.isSample ? "SAMPLE · 7-DAY AVG" : "7-DAY AVERAGE";
-      centerTrendText.textContent = trend ? trend.text : "";
-      centerTrendText.setAttribute("class", `center-trend${trend ? ` ${trend.className}` : ""}`);
-      centerPeriodText.textContent = `${defaultTitle.toUpperCase()} · ${historyPosition.toUpperCase()}`;
+      centerTrendText.textContent = `TIME IN RANGE · ${visibleTimeInRange}`;
+      centerTrendText.setAttribute("class", "center-trend");
+      centerPeriodText.textContent = trend
+        ? `${trend.text.toUpperCase()} · ${historyPosition.toUpperCase()}`
+        : `${defaultTitle.toUpperCase()} · ${historyPosition.toUpperCase()}`;
     };
     const showPatternDefault = () => {
-      centerValueText.setAttribute("class", "center-value");
-      centerValueText.textContent = String(detectedPatterns.length);
-      centerUnitText.textContent = detectedPatterns.length === 1 ? "RECURRING WINDOW" : "RECURRING WINDOWS";
-      centerLabelText.textContent = "VISIBLE WEEK";
+      centerValueText.setAttribute("class", "center-value range-share-value");
+      centerValueText.replaceChildren();
+      const belowText = svgElement("tspan", { class: "range-share-low" });
+      belowText.textContent = Number.isFinite(visibleRange.below) ? `${Math.round(visibleRange.below)}%` : "—";
+      const separator = svgElement("tspan", { class: "range-share-separator" });
+      separator.textContent = "  /  ";
+      const aboveText = svgElement("tspan", { class: "range-share-high" });
+      aboveText.textContent = Number.isFinite(visibleRange.above) ? `${Math.round(visibleRange.above)}%` : "—";
+      centerValueText.append(belowText, separator, aboveText);
+      centerUnitText.textContent = "BELOW 3.9 · ABOVE 10.0";
+      centerLabelText.textContent = "7-DAY TIME SHARE";
       centerTrendText.setAttribute("class", "center-trend");
-      centerTrendText.textContent = detectedPatterns.length ? "TOUCH COLOR TO EXPLORE" : "NO STRONG REPEAT DETECTED";
+      centerTrendText.textContent = detectedPatterns.length
+        ? `${detectedPatterns.length} RECURRING ${detectedPatterns.length === 1 ? "WINDOW" : "WINDOWS"} · TOUCH COLOR`
+        : "NO STRONG REPEAT DETECTED";
       centerPeriodText.textContent = defaultTitle.toUpperCase();
     };
     const syncDayDial = () => {

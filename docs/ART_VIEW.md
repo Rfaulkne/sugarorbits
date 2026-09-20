@@ -62,3 +62,11 @@ Archive: archive/v0.7.0-orbital-tide.
 Art now draws each uninterrupted glucose section directly as a fixed, faint-grey path. Exactly one dot is rendered per day using a very short round-capped dash on the longest available section. CSS dash-offset animation moves it without transforming the underlying curve.
 
 Archive: archive/v0.8.0-moving-trims.
+
+## v0.9.1 center statistics
+
+When all detailed rings are visible, the center keeps 7-day average glucose as its primary number and adds the displayed week's time in range beneath it. The lower line retains the previous-week comparison when available.
+
+The Trends default center shows the percentage of readings below 3.9 mmol/L and above 10.0 mmol/L for the displayed week. Values exactly at 3.9 or 10.0 count as in range. Touching a recurring colour window temporarily replaces these totals with that pattern's recurrence detail.
+
+Archive: archive/v0.9.0-monochrome-orbits.

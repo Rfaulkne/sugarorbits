@@ -1,5 +1,14 @@
 # Sugar Orbits version history
 
+## 0.9.1 — 2026-09-20
+
+- Show 7-day time in range beneath average glucose when all seven detailed rings are visible.
+- Preserve the subtle comparison with the previous week on the lower center line.
+- Replace the Trends default pattern count with the displayed week's percentage below 3.9 and percentage above 10.0 mmol/L.
+- Use the same explicit threshold logic for daily and weekly percentages: below `<3.9`, in range `3.9–10.0` inclusive, and above `>10.0`.
+- Keep pattern-touch details, monochrome home orbits, swipes, probes and history gestures unchanged.
+- Preserve archive/v0.9.0-monochrome-orbits before this change.
+
 ## 0.9.0 — 2026-09-20
 
 - Make the Art home screen monochrome with fixed, faint-grey glucose curves.
