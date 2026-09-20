@@ -893,9 +893,19 @@
           id: `art-mask-${dayIndex}`, maskUnits: "userSpaceOnUse",
           x: 0, y: 0, width: cx * 2, height: cx * 2
         });
+        const trimMask = svgElement("mask", {
+          id: `art-trim-mask-${dayIndex}`, maskUnits: "userSpaceOnUse",
+          x: 0, y: 0, width: cx * 2, height: cx * 2
+        });
         defs.appendChild(mask);
+        defs.appendChild(trimMask);
         const colors = svgElement("g", { mask: `url(#art-mask-${dayIndex})` });
+        const trimColors = svgElement("g", {
+          mask: `url(#art-trim-mask-${dayIndex})`,
+          class: "art-trim-colors"
+        });
         layer.appendChild(colors);
+        layer.appendChild(trimColors);
         let segmentId = 0;
         chunksFor(day).forEach(chunk => {
           const points = shapedPoints(chunk, cx, cy, radius, shapeGap);
@@ -904,6 +914,16 @@
           mask.appendChild(svgElement("path", {
             d: smoothPath(points), fill: "none", stroke: "white",
             "stroke-width": 1.9, "stroke-linecap": "round", "stroke-linejoin": "round"
+          }));
+          trimMask.appendChild(svgElement("path", {
+            d: smoothPath(points),
+            fill: "none",
+            stroke: "white",
+            "stroke-width": 4,
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            pathLength: 100,
+            class: "art-trim-mask-path"
           }));
           let start = points[0];
           for (let i = 1; i < points.length; i++) {
@@ -926,12 +946,15 @@
             const d = `M${start.x.toFixed(2)},${start.y.toFixed(2)}` + (i < points.length - 1
               ? ` Q${control.x.toFixed(2)},${control.y.toFixed(2)} ${end.x.toFixed(2)},${end.y.toFixed(2)}`
               : ` L${end.x.toFixed(2)},${end.y.toFixed(2)}`);
-            colors.appendChild(svgElement("path", { d, stroke: `url(#${id})`, class: "art-segment" }));
+            const attributes = { d, stroke: `url(#${id})`, class: "art-segment" };
+            colors.appendChild(svgElement("path", attributes));
+            trimColors.appendChild(svgElement("path", attributes));
             start = end;
           }
         });
         layer.style.setProperty("--ring-delay", `${dayIndex * 75}ms`);
-        layer.style.setProperty("--tide-delay", `${dayIndex * -1.35}s`);
+        layer.style.setProperty("--trim-delay", `${dayIndex * -1.7}s`);
+        layer.style.setProperty("--trim-duration", `${17 + dayIndex * 0.55}s`);
         return layer;
   }
 

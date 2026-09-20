@@ -1,5 +1,13 @@
 # Sugar Orbits version history
 
+## 0.8.0 — 2026-09-20
+
+- Replace Art's orbital tide with stationary data geometry and a clockwise path-trim animation.
+- Keep every complete glucose trace visible while a slightly wider slice of its original data colours travels around each ring.
+- Stagger trim phase and speed between days for quiet wall-display movement without synchronised pulsing.
+- Apply the trim independently to each uninterrupted data chunk so missing Dexcom intervals remain visible gaps.
+- Preserve archive/v0.7.0-orbital-tide before this change.
+
 ## 0.7.0 — 2026-09-20
 
 - Replace whole-wheel breathing with a staggered orbital tide: a subtle opacity and 0.7% scale wave travels between individual Art rings without changing their data geometry.

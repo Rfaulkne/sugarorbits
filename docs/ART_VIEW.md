@@ -4,7 +4,7 @@ The round display and phone start with seven gradient data traces and a simple c
 
 The palette is reused from the September 16 spectrum prototype. Its blue/cyan, pale neutral, violet, coral and orange stops interpolate by mmol/L, not clock position. It is expressive rather than a binary high/low legend; the unchanged detail view retains blue/orange threshold segments. Art uses the same shaped data geometry and gap boundaries as detail. It does not fabricate seven full rings when fewer days exist.
 
-The reveal lasts under two seconds, with staggered ring movement and opacity, and then settles into a sixteen-second orbital tide. Individual rings brighten in sequence and move by at most 0.7%, creating an inward/outward travelling wave instead of scaling the whole portrait together. Reduced-motion mode keeps the rings static. A pointer-down after two minutes without pointer activity replays the reveal when already in Art. This is an idle-touch heuristic; there is no direct display-power event from labwc to the web page. The selected mode is retained during screen sleep; waking from detail does not force Art.
+The reveal lasts under two seconds, with staggered ring movement and opacity, and then settles into a slow path-trim animation. Ring geometry remains stationary. A slightly wider slice of each ring's original data colours moves clockwise along its real glucose path, with phase and speed staggered between days. Missing-data gaps remain gaps because every uninterrupted data chunk is trimmed separately. Reduced-motion mode keeps the trim stationary. A pointer-down after two minutes without pointer activity replays the reveal when already in Art. This is an idle-touch heuristic; there is no direct display-power event from labwc to the web page. The selected mode is retained during screen sleep; waking from detail does not force Art.
 
 Only the Sugar Orbits title appears in Art; sync alerts remain in detail. Swipe to detail to check the data status or retry a failed sync. Cached data can remain on screen while offline. If initial live loading fails with no data loaded, the app falls back to the visibly labelled sample/detail view.
 
@@ -39,7 +39,7 @@ The title sits at the center on Art and above the numeric readout on detail/tren
 
 Colour segments now paint through one continuous stroke mask per uninterrupted data chunk. The visible stroke remains 1.9 SVG units wide; the underlying colour strokes are wider to avoid cap-shaped seams. Glucose values and path geometry have not been changed. Confirm actual antialiasing and frame rate on the Pi.
 
-The orbital tide pauses after 120 seconds without pointer/keyboard input, outside Art, and when the browser document is hidden. Input resumes it. This matches the configured screen-idle duration but does not read labwc display power state directly. Reduced motion disables the animation entirely. No measured energy-saving claim is made.
+The moving trim pauses after 120 seconds without pointer/keyboard input, outside Art, and when the browser document is hidden. Input resumes it. This matches the configured screen-idle duration but does not read labwc display power state directly. Reduced motion disables the animation entirely. No measured energy-saving claim is made.
 
 Archives: archive/v0.3.1-swipe-verified and archive/v0.4.0-breathing-title.
 
@@ -50,3 +50,9 @@ Art uses the staggered orbital tide described above. In Trends, the 3.9 and 10.0
 On Seven days, a selected day shows its time in range. During press-and-drag probing, the recorded glucose value and timestamp remain primary while that day's time in range stays visible beneath them. Opening screen shutdown requires a stationary three-second hold; movement beyond 14 pixels cancels it.
 
 Archive: archive/v0.6.0-touch-probe.
+
+## v0.8.0 stationary Art geometry
+
+Art no longer scales or breathes after its initial reveal. Its base glucose profiles remain fully visible and fixed. A normalized SVG path mask reveals a wider duplicate of the same colour gradient along a short moving section, producing the travelling trim without substituting a generic highlight colour.
+
+Archive: archive/v0.7.0-orbital-tide.

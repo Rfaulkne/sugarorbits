@@ -1110,11 +1110,16 @@ body.round-display {
   stroke-linejoin: round;
 }
 .art-ring {
-  opacity: 0.78;
-  transform-box: view-box;
-  transform-origin: center;
-  animation: orbital-tide 16s ease-in-out infinite;
-  animation-delay: var(--tide-delay);
+  opacity: 0.88;
+}
+.art-trim-colors {
+  opacity: 0.98;
+}
+.art-trim-mask-path {
+  stroke-dasharray: 11 89;
+  stroke-dashoffset: 0;
+  animation: art-trim-orbit var(--trim-duration) linear infinite;
+  animation-delay: var(--trim-delay);
 }
 .is-art-revealing .art-ring {
   transform-box: view-box;
@@ -1126,15 +1131,13 @@ body.round-display {
   from { opacity: 0; transform: rotate(-9deg) scale(0.94); }
   to { opacity: 0.88; transform: rotate(0) scale(1); }
 }
-@keyframes orbital-tide {
-  0%, 100% { opacity: 0.74; transform: scale(0.998); }
-  38% { opacity: 0.82; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.007); }
-  64% { opacity: 0.84; transform: scale(1.001); }
+@keyframes art-trim-orbit {
+  to { stroke-dashoffset: -100; }
 }
 @media (prefers-reduced-motion: reduce) {
   .is-art-revealing .art-ring,
   .art-ring { animation: none; opacity: 0.88; }
+  .art-trim-mask-path { animation: none; }
   .trend-range-glow { animation: none; }
 }
 
@@ -1249,7 +1252,7 @@ body.round-display {
   font-size: 19px;
   letter-spacing: 0.045em;
 }
-.art-motion-paused .art-ring,
-.art-layer.is-hidden .art-ring {
+.art-motion-paused .art-trim-mask-path,
+.art-layer.is-hidden .art-trim-mask-path {
   animation-play-state: paused;
 }

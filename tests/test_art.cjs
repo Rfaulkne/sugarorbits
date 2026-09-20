@@ -18,7 +18,10 @@ const points = [{minute:0,value:3},{minute:5,value:6},{minute:10,value:12},{minu
 const ring=context.artRing(points,0,360,363,200,10);
 const paths=ring.children.find(n=>n.attrs.mask).children.filter(n=>n.tag==='path');
 const mask=ring.children[0].children.find(n=>n.tag==='mask');
+const trimMask=ring.children[0].children.filter(n=>n.tag==='mask')[1];
 assert.equal(mask.children.length,2,'Each continuous data chunk gets one smooth silhouette');
+assert.equal(trimMask.children.length,2,'Each data chunk gets one moving trim without bridging gaps');
+assert.equal(trimMask.children[0].attrs.pathLength,100,'Trim motion uses normalized path length');
 assert.equal(paths.length,3,'A missing-data gap must not get a connecting segment');
 const chunks=context.chunksFor(points);
 let offset=0;
@@ -42,9 +45,10 @@ assert.equal(context.nearestTimedPoint(timed,680),null,'Probe does not invent a 
 assert.match(source,/TIME IN RANGE · \$\{Math\.round\(dayTimeInRange\)\}%/,'Probe keeps daily time in range visible');
 assert.match(source,/moved > 14/,'Shutdown hold cancels on finger movement');
 assert.match(source,/\}, 3000\);/,'Shutdown title requires a three-second hold');
-assert.match(styles,/@keyframes orbital-tide/,'Art uses the orbital tide motion');
+assert.match(styles,/@keyframes art-trim-orbit/,'Art uses moving path trims');
 assert.match(styles,/\.trend-range-glow/,'Trend range markers include an orbiting glow');
 assert.doesNotMatch(styles,/@keyframes orbit-breathe/,'Whole-wheel breathing is removed');
+assert.doesNotMatch(styles,/@keyframes orbital-tide/,'Ring scaling tide is removed');
 const listeners={};let now=0,changes=0;
 Object.assign(context,{
  stage:{addEventListener:(n,f)=>(listeners[n]??=[]).push(f),classList:{add(){},remove(){}}},
