@@ -43,6 +43,7 @@
   let shutdownRequested = false;
   let viewMode = "art";
   let mobileSelectedDay = null;
+  let orbitProbePointer = null;
   let applyViewMode = () => {};
   const phoneLayout = window.matchMedia("(max-width: 580px)");
   const roundDisplayLayout = window.matchMedia(
@@ -382,11 +383,33 @@
     return runs.filter(run => run.end - run.start >= 1);
   }
 
+  function shapedRadiusForValue(value, radius, gap, intensity = 1) {
+    return radius + Math.tanh((value - TARGET_MMOL) / 3.3) * gap * 3.0 * intensity;
+  }
+
+  function minuteFromCartesian(x, y, cx, cy) {
+    const angle = Math.atan2(y - cy, x - cx) + Math.PI / 2;
+    return ((angle + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * 1440;
+  }
+
+  function nearestTimedPoint(points, minute, maxGap = 15) {
+    let nearest = null;
+    let nearestGap = Infinity;
+    points.forEach(point => {
+      const directGap = Math.abs(point.minute - minute);
+      const circularGap = Math.min(directGap, 1440 - directGap);
+      if (circularGap < nearestGap) {
+        nearest = point;
+        nearestGap = circularGap;
+      }
+    });
+    return nearestGap <= maxGap ? nearest : null;
+  }
+
   function shapedPoints(points, cx, cy, radius, gap, intensity = 1) {
     return points.map(point => {
       const angle = (point.minute / 1440) * Math.PI * 2 - Math.PI / 2;
-      const offset = Math.tanh((point.value - TARGET_MMOL) / 3.3) * gap * 3.0 * intensity;
-      const shapedRadius = radius + offset;
+      const shapedRadius = shapedRadiusForValue(point.value, radius, gap, intensity);
       return {
         x: cx + shapedRadius * Math.cos(angle),
         y: cy + shapedRadius * Math.sin(angle),
@@ -1023,6 +1046,14 @@
     const trendRadius = averageRadius;
     const trendMeanPoints = averageProfilePoints(averageProfile, cx, cy, trendRadius, width);
     const trendPoints = averageProfilePoints(patternProfile, cx, cy, trendRadius, width);
+    const trendLowReference = averageProfilePoints(
+      averageProfile.map(point => ({ ...point, value: LOW_MMOL })),
+      cx, cy, trendRadius, width
+    );
+    const trendHighReference = averageProfilePoints(
+      averageProfile.map(point => ({ ...point, value: HIGH_MMOL })),
+      cx, cy, trendRadius, width
+    );
     const trendWindowGroups = [];
 
     detectedPatterns.forEach(pattern => {
@@ -1105,6 +1136,16 @@
       class: "trend-summary",
       "aria-hidden": "true"
     });
+    if (trendLowReference.length && trendHighReference.length) {
+      summaryLayer.appendChild(svgElement("path", {
+        d: closedSmoothPath(trendLowReference),
+        class: "trend-range-reference is-low"
+      }));
+      summaryLayer.appendChild(svgElement("path", {
+        d: closedSmoothPath(trendHighReference),
+        class: "trend-range-reference is-high"
+      }));
+    }
     summaryLayer.appendChild(svgElement("circle", {
       cx,
       cy,
@@ -1170,6 +1211,15 @@
     const centerPeriodText = addText(svg, cx, cy + 82, "center-period", "middle", "");
 
     const groups = [...daysLayer.querySelectorAll(".radial-day")];
+    const probeMarker = svgElement("circle", {
+      cx,
+      cy,
+      r: Math.max(3.4, width * 0.0065),
+      class: "data-probe-marker",
+      visibility: "hidden",
+      "aria-hidden": "true"
+    });
+    daysLayer.appendChild(probeMarker);
     let activeDay = null;
     const defaultTitle = `${formatDate(currentProfile.dates[0])} — ${formatDate(currentProfile.dates[lastDayIndex])}`;
     const historyPosition = `week ${currentProfile.periodOffset + 1} of ${currentProfile.availablePeriodCount}`;
@@ -1257,8 +1307,36 @@
       centerTrendText.textContent = "";
       centerPeriodText.textContent = "";
     };
+    const showPointProbe = (index, minute) => {
+      selectDay(index);
+      const point = nearestTimedPoint(currentProfile.days[index], minute);
+      if (!point) {
+        probeMarker.setAttribute("visibility", "hidden");
+        centerValueText.setAttribute("class", "center-value");
+        centerValueText.textContent = "—";
+        centerUnitText.textContent = "NO READING";
+        centerLabelText.textContent = `${formatDate(currentProfile.dates[index]).toUpperCase()} · ${formatClock(Math.round(minute))}`;
+        centerTrendText.textContent = "";
+        centerPeriodText.textContent = "";
+        return;
+      }
+      const markerPoint = shapedPoints(
+        [point], cx, cy, innerRadius + index * gap, shapeGap
+      )[0];
+      probeMarker.setAttribute("cx", markerPoint.x.toFixed(2));
+      probeMarker.setAttribute("cy", markerPoint.y.toFixed(2));
+      probeMarker.setAttribute("visibility", "visible");
+      probeMarker.setAttribute("class", `data-probe-marker is-${zone(point.value)}`);
+      centerValueText.setAttribute("class", `center-value is-${zone(point.value)}`);
+      centerValueText.textContent = point.value.toFixed(1);
+      centerUnitText.textContent = "MMOL/L";
+      centerLabelText.textContent = `${formatDate(currentProfile.dates[index]).toUpperCase()} · ${formatClock(point.minute)}`;
+      centerTrendText.textContent = "";
+      centerPeriodText.textContent = "";
+    };
     const clearDay = () => {
       activeDay = null;
+      probeMarker.setAttribute("visibility", "hidden");
       groups.forEach(group => group.classList.remove("is-selected", "is-dimmed"));
       showDefaultCenter();
     };
@@ -1280,16 +1358,66 @@
       syncDayDial();
     };
     syncDayDial();
-    const handleOrbitPointer = event => {
-      if (viewMode !== "days") return;
-      if (threeFingerGestureActive) return;
-      if (phoneLayout.matches && event.pointerType === "touch") return;
+    const pointerLocal = event => {
       const transform = svg.getScreenCTM();
-      if (!transform) return;
+      if (!transform) return null;
       const pointer = svg.createSVGPoint();
       pointer.x = event.clientX;
       pointer.y = event.clientY;
-      const local = pointer.matrixTransform(transform.inverse());
+      return pointer.matrixTransform(transform.inverse());
+    };
+    const orbitCandidate = (local, minute) => {
+      const distance = Math.hypot(local.x - cx, local.y - cy);
+      if (distance < innerRadius - gap * 3 || distance > outerRadius + gap * 3) return null;
+      let best = null;
+      currentProfile.days.forEach((day, index) => {
+        const point = nearestTimedPoint(day, minute);
+        const nominalRadius = innerRadius + index * gap;
+        const visibleRadius = point
+          ? shapedRadiusForValue(point.value, nominalRadius, shapeGap)
+          : nominalRadius;
+        const radialGap = Math.abs(distance - visibleRadius);
+        if (!best || radialGap < best.radialGap) best = { index, radialGap };
+      });
+      return best && best.radialGap <= gap * 3 ? best.index : null;
+    };
+    const updateOrbitProbe = event => {
+      const local = pointerLocal(event);
+      if (!local) return;
+      const minute = minuteFromCartesian(local.x, local.y, cx, cy);
+      const candidate = orbitCandidate(local, minute);
+      if (candidate === null) return;
+      showPointProbe(candidate, minute);
+    };
+    const beginOrbitProbe = event => {
+      if (viewMode !== "days" || threeFingerGestureActive || event.isPrimary === false) return false;
+      if (event.button !== undefined && event.button !== 0) return false;
+      const local = pointerLocal(event);
+      if (!local) return false;
+      const minute = minuteFromCartesian(local.x, local.y, cx, cy);
+      if (orbitCandidate(local, minute) === null) return false;
+      orbitProbePointer = event.pointerId;
+      if (stage.setPointerCapture) stage.setPointerCapture(event.pointerId);
+      updateOrbitProbe(event);
+      return true;
+    };
+    const endOrbitProbe = event => {
+      if (event.pointerId !== orbitProbePointer) return false;
+      orbitProbePointer = null;
+      clearDay();
+      return true;
+    };
+    const handleOrbitPointer = event => {
+      if (viewMode !== "days") return;
+      if (threeFingerGestureActive) return;
+      if (event.pointerId === orbitProbePointer) {
+        updateOrbitProbe(event);
+        return;
+      }
+      if (phoneLayout.matches && event.pointerType === "touch") return;
+      if (event.pointerType === "touch") return;
+      const local = pointerLocal(event);
+      if (!local) return;
       const distance = Math.hypot(local.x - cx, local.y - cy);
       if (distance < innerRadius - gap * 3 || distance > outerRadius + gap * 3) {
         if (activeDay !== null) clearDay();
@@ -1312,12 +1440,8 @@
       shutdownTitleHit.classList.remove("is-holding");
     };
     const pointerDistanceFromCenter = event => {
-      const transform = svg.getScreenCTM();
-      if (!transform) return Infinity;
-      const pointer = svg.createSVGPoint();
-      pointer.x = event.clientX;
-      pointer.y = event.clientY;
-      const local = pointer.matrixTransform(transform.inverse());
+      const local = pointerLocal(event);
+      if (!local) return Infinity;
       return Math.hypot(local.x - cx, local.y - cy);
     };
     const beginShutdownHold = event => {
@@ -1341,15 +1465,24 @@
       trackShutdownHold(event);
     };
     stage.onpointerdown = event => {
-      handleOrbitPointer(event);
-      beginShutdownHold(event);
+      const probing = beginOrbitProbe(event);
+      if (!probing) {
+        handleOrbitPointer(event);
+        beginShutdownHold(event);
+      }
     };
-    stage.onpointerup = cancelShutdownHold;
+    stage.onpointerup = event => {
+      endOrbitProbe(event);
+      cancelShutdownHold();
+    };
     stage.onpointerleave = event => {
       cancelShutdownHold();
-      if (viewMode === "days" && event.pointerType !== "touch") clearDay();
+      if (viewMode === "days" && event.pointerType !== "touch" && orbitProbePointer === null) clearDay();
     };
-    stage.onpointercancel = stage.onpointerleave;
+    stage.onpointercancel = event => {
+      endOrbitProbe(event);
+      cancelShutdownHold();
+    };
     svg.oncontextmenu = event => {
       if (phoneLayout.matches || pointerDistanceFromCenter(event) <= innerRadius * 0.75) event.preventDefault();
     };
@@ -1629,6 +1762,7 @@
         triggered: false
       };
       threeFingerGestureActive = true;
+      orbitProbePointer = null;
       mobileSelectedDay = null;
       clearCurrentDay();
       swipeStart = null;
@@ -1662,6 +1796,10 @@
 
   stage.addEventListener("pointerdown", event => {
     if (!introVortex.hidden) return;
+    if (orbitProbePointer === event.pointerId) {
+      swipeStart = null;
+      return;
+    }
     // Some kiosk touch drivers deliver mouse-like pointer events.
     if (event.pointerType === "mouse" && event.button !== 0) return;
     // Only a single finger may switch views; reserve multi-touch for history.
@@ -1680,6 +1818,10 @@
     };
   });
   stage.addEventListener("pointerup", event => {
+    if (orbitProbePointer === event.pointerId) {
+      swipeStart = null;
+      return;
+    }
     if (!swipeStart || event.pointerId !== swipeStart.pointerId) return;
     const deltaX = event.clientX - swipeStart.x;
     const deltaY = event.clientY - swipeStart.y;

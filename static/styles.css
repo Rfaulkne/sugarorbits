@@ -621,6 +621,7 @@ button, a { font: inherit; }
 .trend-day-event,
 .trend-target-orbit,
 .trend-mean-orbit,
+.trend-range-reference,
 .trend-summary-profile,
 .trend-summary-arc {
   fill: none;
@@ -682,6 +683,15 @@ button, a { font: inherit; }
   stroke-width: 1;
 }
 
+.trend-range-reference {
+  stroke: rgba(184, 167, 217, 0.22);
+  stroke-dasharray: 2 7;
+  stroke-width: 0.85;
+}
+
+.trend-range-reference.is-low { opacity: 0.72; }
+.trend-range-reference.is-high { opacity: 0.9; }
+
 .trend-summary-profile {
   stroke: rgba(241, 244, 237, 0.32);
   stroke-width: 1.8;
@@ -711,6 +721,16 @@ button, a { font: inherit; }
 .radial-day.is-selected .target-reference { opacity: 1; }
 .radial-day.is-selected .profile-line { stroke: rgba(241, 244, 237, 0.6); }
 .radial-day.is-selected .glucose-arc { stroke-width: 5; }
+
+.data-probe-marker {
+  fill: var(--ink);
+  stroke: var(--night);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.data-probe-marker.is-high { fill: var(--orange); }
+.data-probe-marker.is-low { fill: var(--blue); }
 
 .days-hover-backdrop {
   fill: transparent;
@@ -1147,8 +1167,8 @@ body.round-display {
 }
 .shutdown-confirm {
   position: relative;
-  width: 148px;
-  height: 148px;
+  width: clamp(190px, 30vmin, 240px);
+  height: clamp(190px, 30vmin, 240px);
   overflow: hidden;
   border: 1px solid rgba(188, 161, 212, 0.34);
   border-radius: 50%;
@@ -1174,7 +1194,7 @@ body.round-display {
   inset: 0;
   transform: none;
 }
-.shutdown-button-label { position: relative; z-index: 1; font-size: 11px; }
+.shutdown-button-label { position: relative; z-index: 1; font-size: 13px; }
 @keyframes shutdown-fill {
   from { inset: 50%; transform: translate(-50%, -50%) scale(0); }
   to { inset: 0; transform: translate(0, 0) scale(1); }
@@ -1197,11 +1217,15 @@ body.round-display {
 .art-breathing {
   transform-box: view-box;
   transform-origin: center;
-  animation: orbit-breathe 10s ease-in-out infinite;
+  animation: orbit-breathe 8.6s linear infinite;
 }
 @keyframes orbit-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+  0%, 18% { transform: scale(1); }
+  54% { transform: scale(1.008); }
+  68% { transform: scale(1.03); }
+  73% { transform: scale(1.004); }
+  78% { transform: scale(1.016); }
+  85%, 100% { transform: scale(1); }
 }
 .art-motion-paused .art-breathing,
 .art-layer.is-hidden .art-breathing {

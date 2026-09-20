@@ -1,5 +1,14 @@
 # Sugar Orbits version history
 
+## 0.6.0 — 2026-09-20
+
+- Add a press-and-drag probe to Seven days: angle follows time, radial movement follows the visible day trace, and the center reports the nearest real Dexcom timestamp and value. Releasing restores the complete week.
+- Do not fabricate values across missing-data gaps; the probe displays “no reading” when no sample is within 15 minutes.
+- Add subtle 3.9 and 10.0 mmol/L reference profiles behind the Trends average curve.
+- Enlarge the safe-shutdown confirmation circle for a more forgiving finger target.
+- Replace the symmetric breathing loop with an asymmetric slow-build, quick double-pulse rhythm while retaining the 3% maximum expansion and motion-reduction behavior.
+- Preserve archive/v0.5.0-screen-shutdown before this change.
+
 ## 0.5.0 — 2026-09-20
 
 - Add a screen-only safe shutdown flow: hold the centered title, then complete a separate hold-to-confirm action.
