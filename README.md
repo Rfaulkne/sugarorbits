@@ -4,6 +4,8 @@
 
 Building the round unit or designing its enclosure? See the **[hardware BOM and mechanical references](docs/HARDWARE_BOM.md)**.
 
+Exploring a simpler non-touch build? See the **[Low-Cost E-Paper Edition](docs/LOW_COST_EPAPER.md)**.
+
 Sugar Orbits turns four rolling weeks of personal Dexcom G7 readings into
 artistic seven-day radial glucose portraits. Each orbit is one day, time runs
 clockwise, and the glucose curve deforms the ring. The Trends view reveals
@@ -64,7 +66,7 @@ Extract the project, open PowerShell in its folder, then run:
 
 ```powershell
 py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt
 Copy-Item .env.example .env
 notepad .env
 ```
@@ -80,7 +82,7 @@ DEXCOM_SHARE_REGION=ous
 Do not put quotation marks around the values. Save the file and run:
 
 ```powershell
-.\.venv\Scripts\python.exe app.py
+.\\.venv\\Scripts\\python.exe app.py
 ```
 
 Open <http://127.0.0.1:8787>.
