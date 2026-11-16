@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import ipaddress
 import os
+import secrets
 import socket
 import subprocess
 import threading
@@ -18,6 +19,8 @@ from urllib.parse import parse_qs, urlsplit
 from app_auth import access_code_matches, create_session_value, verify_session_value
 from dexcom_share import DexcomShareCollector, DexcomShareConfig, DexcomShareError
 from glucose_store import GlucoseStore
+from orbit_focus import FocusStore, Rhythm, guide
+from orbit_ai import AIUnavailable, OrbitAI
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -120,6 +123,27 @@ COLLECTOR = DexcomShareCollector(
     ),
     GLUCOSE_STORE,
 )
+FOCUS_STORE = FocusStore(SETTINGS.data_dir)
+ORBIT_AI = OrbitAI()
+FOCUS_CSRF = secrets.token_urlsafe(32)
+
+
+def focus_state(demo=False):
+    tz = os.getenv("APP_TIMEZONE", "Europe/Berlin")
+    if demo:
+        from orbit_demo import demo_records
+        rhythm = Rhythm(demo_records(tz=tz), tz)
+    else:
+        rhythm = Rhythm(GLUCOSE_STORE.records(35), tz)
+    state = rhythm.state()
+    state["demo"] = demo
+    state["events"] = [] if demo else FOCUS_STORE.events(rhythm.now)
+    state["focus"] = None if demo else FOCUS_STORE.focus_state(rhythm)
+    state["guide"] = guide(state)
+    state["csrf"] = FOCUS_CSRF
+    state["aiEnabled"] = ORBIT_AI.enabled() and not demo
+    state["collector"] = {"configured": SETTINGS.configured, "lastSyncAt": COLLECTOR.status()["lastSyncAt"]}
+    return state
 
 
 def fetch_cached_glucose(days: int) -> dict[str, Any]:
@@ -175,7 +199,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+            "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; "
             "base-uri 'none'; form-action 'self'",
         )
 
@@ -205,6 +229,10 @@ class AppHandler(BaseHTTPRequestHandler):
         except FileNotFoundError:
             self._json(404, {"error": "not_found"})
             return
+        if filename == "unlock.html":
+            destination = parse_qs(urlsplit(self.path).query).get("next", ["/"])[0]
+            if destination in {"/phone", "/rhythm"}:
+                body = body.replace(b'action="/auth/app"', f'action="/auth/app?next={destination}"'.encode())
         self.send_response(HTTPStatus.OK)
         self._security_headers()
         self.send_header("Content-Type", content_type)
@@ -248,6 +276,77 @@ class AppHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length).decode("utf-8", errors="replace")
         return parse_qs(body)
 
+    def _companion_allowed(self):
+        # Legacy trusted-LAN preview must not silently expose the new health log.
+        if not is_loopback_address(self.client_address[0]) and not (
+            SETTINGS.app_access_code and SETTINGS.app_session_secret
+        ):
+            self._json(503, {"error": "companion_locked", "message": "Phone access needs APP_ACCESS_CODE and APP_SESSION_SECRET configured privately on the Pi."})
+            return False
+        return True
+
+    def _focus_post(self, path):
+        if not self._companion_allowed():
+            return
+        if not secrets.compare_digest(self.headers.get("X-Orbit-CSRF", ""), FOCUS_CSRF):
+            self._json(403, {"error": "csrf_required", "message": "Reload the page before saving."})
+            return
+        origin = self.headers.get("Origin")
+        if origin and urlsplit(origin).netloc != self.headers.get("Host"):
+            self._json(403, {"error": "origin_denied"})
+            return
+        try:
+            maximum = 1_700_000 if path == "/api/v2/food-draft" else 8192
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= maximum:
+                self.close_connection = True
+                self._json(413, {"error": "body_limit", "message": "Request is too large or empty."})
+                return
+            if self.headers.get_content_type() != "application/json":
+                raise ValueError("Use application/json")
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict):
+                raise ValueError("Expected an object")
+            rhythm = Rhythm(GLUCOSE_STORE.records(35), os.getenv("APP_TIMEZONE", "Europe/Berlin"))
+            if path == "/api/v2/events":
+                result = {"id": FOCUS_STORE.add_event(payload)}
+            elif path == "/api/v2/events/delete":
+                FOCUS_STORE.delete_event(payload.get("id", ""))
+                result = {"deleted": True}
+            elif path == "/api/v2/focus":
+                result = {"focus": FOCUS_STORE.start_focus(payload, rhythm)}
+            elif path == "/api/v2/checkin":
+                FOCUS_STORE.checkin(payload, rhythm)
+                result = {"saved": True}
+            elif path == "/api/v2/reflection":
+                FOCUS_STORE.reflect(payload, rhythm)
+                result = {"saved": True}
+            elif path == "/api/v2/focus/renew":
+                active = FOCUS_STORE.active(rhythm.now)
+                if not active or payload.get("id") != active["id"]:
+                    raise ValueError("No matching active focus")
+                result = {"focus": FOCUS_STORE.start_focus(active, rhythm, renew_id=active["id"])}
+            elif path == "/api/v2/focus/finish":
+                active = FOCUS_STORE.active()
+                if not active or payload.get("id") != active["id"]:
+                    raise ValueError("No matching active focus")
+                FOCUS_STORE.finish(active["id"])
+                result = {"finished": True}
+            elif path == "/api/v2/coach":
+                result = ORBIT_AI.coach(focus_state(), payload.get("consent"))
+            elif path == "/api/v2/food-draft":
+                result = ORBIT_AI.food(payload)
+            else:
+                self._json(404, {"error": "not_found"})
+                return
+            self._json(200, result)
+        except AIUnavailable as exc:
+            self._json(503, {"error": "ai_unavailable", "message": str(exc)})
+        except (ValueError, TypeError, KeyError, UnicodeDecodeError) as error:
+            # Return validation messages, never payloads or provider output.
+            message = str(error) if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError) else "Invalid request data"
+            self._json(400, {"error": "invalid_request", "message": message[:240]})
+
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         if parsed.path == "/healthz":
@@ -255,7 +354,8 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/unlock":
             if self._app_authorized():
-                self._redirect("/")
+                destination = parse_qs(parsed.query).get("next", ["/"])[0]
+                self._redirect(destination if destination in {"/phone", "/rhythm"} else "/")
             else:
                 self._serve_static("unlock.html", "text/html; charset=utf-8")
             return
@@ -265,6 +365,9 @@ class AppHandler(BaseHTTPRequestHandler):
             "/app-icon-180.png",
             "/app-icon-512.png",
             "/sw.js",
+            "/focus.css", "/focus-orbits.js", "/focus-client.js", "/phone.js", "/rhythm.js",
+            "/phone.webmanifest", "/focus-sw.js",
+            "/phone", "/phone/",
         }
         if not self._app_authorized() and parsed.path not in public_static:
             if parsed.path.startswith("/api/"):
@@ -281,6 +384,16 @@ class AppHandler(BaseHTTPRequestHandler):
             "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),
             "/app-icon-180.png": ("app-icon-180.png", "image/png"),
             "/app-icon-512.png": ("app-icon-512.png", "image/png"),
+            "/rhythm": ("focus/rhythm.html", "text/html; charset=utf-8"),
+            "/phone": ("focus/phone.html", "text/html; charset=utf-8"),
+            "/phone/": ("focus/phone.html", "text/html; charset=utf-8"),
+            "/focus.css": ("focus/focus.css", "text/css; charset=utf-8"),
+            "/focus-orbits.js": ("focus/orbits.js", "text/javascript; charset=utf-8"),
+            "/focus-client.js": ("focus/client.js", "text/javascript; charset=utf-8"),
+            "/phone.js": ("focus/phone.js", "text/javascript; charset=utf-8"),
+            "/rhythm.js": ("focus/rhythm.js", "text/javascript; charset=utf-8"),
+            "/phone.webmanifest": ("focus/phone.webmanifest", "application/manifest+json; charset=utf-8"),
+            "/focus-sw.js": ("focus/sw.js", "text/javascript; charset=utf-8"),
         }
         if parsed.path in static_routes:
             self._serve_static(*static_routes[parsed.path])
@@ -300,6 +413,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 }
             )
             self._json(200, status)
+            return
+        if parsed.path == "/api/v2/state":
+            if self._companion_allowed():
+                self._json(200, focus_state(parse_qs(parsed.query).get("demo") == ["1"]))
             return
         if parsed.path == "/api/glucose":
             query = parse_qs(parsed.query)
@@ -325,16 +442,22 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlsplit(self.path)
         if parsed.path == "/auth/app":
+            destination = parse_qs(parsed.query).get("next", ["/"])[0]
+            if destination not in {"/phone", "/rhythm"}:
+                destination = "/"
             submitted = self._read_form().get("access_code", [""])[0]
             if access_code_matches(submitted, SETTINGS.app_access_code):
                 session_value = create_session_value(SETTINGS.app_session_secret)
-                self._redirect("/", self._app_cookie(session_value, 60 * 60 * 24 * 30))
+                self._redirect(destination, self._app_cookie(session_value, 60 * 60 * 24 * 30))
             else:
                 time.sleep(0.35)
-                self._redirect("/unlock#error")
+                self._redirect("/unlock?next=" + destination + "#error")
             return
         if not self._app_authorized():
             self._json(401, {"error": "app_locked", "message": "Unlock Sugar Orbits first"})
+            return
+        if parsed.path.startswith("/api/v2/"):
+            self._focus_post(parsed.path)
             return
         if parsed.path == "/api/sync":
             try:

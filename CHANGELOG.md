@@ -1,5 +1,25 @@
 # Sugar Orbits version history
 
+## 0.10.0-prototype — 2026-11-16
+
+- Add separate `/rhythm` and `/phone` interfaces; preserve `/` and its visual code.
+- Render the last seven completed local days as a true daily-balanced arithmetic
+  mean, with a preceding-week ghost and separate outside-range frequency arcs.
+- Show a current-period wedge, event satellites, nearest-ring touch probe, and a
+  dedicated four-second power-menu hold / two-second shutdown confirmation.
+- Add 28-day / 20-event context retention in a separate SQLite database.
+- Add one active user-defined habit, a frozen seven-day baseline, daily check-ins,
+  separate subjective reflection, due review, and atomic renewal.
+- Add an idempotent phone queue, explicit pending/synced states, undo/deletion
+  retries, same-origin CSRF protection, and required remote companion credentials.
+- Add optional, consent-gated OpenAI wording and food-photo uncertainty drafts.
+  AI is off by default; no raw CGM records or credentials are sent. Meal photos
+  are resized/re-encoded on the phone and never saved by the application.
+- Add a label/weight carbohydrate calculator and independently confirmed food logs.
+- Tests: 40 Python checks, existing art-geometry checks, and DOM/HTTP workflow QA.
+  Real browser launch was blocked in the development environment; actual Safari,
+  Pi touch, layout, camera, service worker and display-sleep QA remain pending.
+
 ## 0.9.1 — 2026-09-20
 
 - Show 7-day time in range beneath average glucose when all seven detailed rings are visible.
