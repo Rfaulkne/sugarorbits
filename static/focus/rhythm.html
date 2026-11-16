@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0c100f">
+  <title>Sugar Orbits · Rhythm</title>
+  <link rel="stylesheet" href="/focus.css">
+  <script src="/focus-orbits.js" defer></script>
+  <script src="/focus-client.js" defer></script>
+  <script src="/rhythm.js" defer></script>
+</head>
+<body class="round-body">
+  <main class="round-shell">
+    <canvas id="orbit" width="800" height="800" aria-label="Seven-day mean glucose rhythm, previous week, and recurring high and low periods"></canvas>
+    <header class="round-head"><p class="eyebrow">SUGAR ORBITS <span id="demo-label" hidden> · DEMO</span></p><span id="connection" class="status">connecting to your Pi</span></header>
+    <div class="orbit-centre" id="centre" aria-live="polite"><span class="eyebrow" id="centre-kicker">YOUR WEEKLY RHYTHM</span><h1 id="centre-title">A little perspective.</h1><p id="centre-note">Loading the local archive…</p><p id="centre-detail"></p></div>
+    <nav class="round-nav" aria-label="Display mode"><button data-mode="rhythm" class="active">Rhythm</button><button data-mode="days">7 days</button><button data-mode="focus">Focus</button></nav>
+    <p class="round-hint" id="hint">swipe to explore · touch to reveal</p>
+    <button id="power" class="power-trigger" aria-label="Hold four seconds for power options" hidden>⏻</button>
+    <dialog id="power-dialog"><h2>A quiet pause.</h2><p>Hold for two seconds to safely shut down the Pi. Wait for shutdown before unplugging.</p><button id="power-confirm" class="primary">Hold to power off</button><button id="power-cancel">Keep going</button></dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </main>
+</body>
+</html>

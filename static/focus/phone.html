@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0c100f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Orbit Focus">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Sugar Orbits · Pocket</title>
+  <link rel="manifest" href="/phone.webmanifest">
+  <link rel="apple-touch-icon" href="/app-icon-180.png">
+  <link rel="stylesheet" href="/focus.css">
+  <script src="/focus-orbits.js" defer></script>
+  <script src="/focus-client.js" defer></script>
+  <script src="/phone.js" defer></script>
+</head>
+<body class="phone-body">
+  <div class="phone-shell">
+    <header class="phone-head"><a href="/phone" class="brand"><span class="brand-mark" aria-hidden="true">◌</span>SUGAR ORBITS</a><span id="connection" class="status">connecting</span></header>
+    <div id="demo-banner" class="notice" hidden>Synthetic preview · nothing here is your glucose data. Logging is disabled.</div>
+    <div id="network-banner" class="notice" role="status" hidden></div>
+    <main>
+      <section id="tab-log" class="phone-tab">
+        <div class="intro-copy"><p class="eyebrow" id="greeting">A MOMENT OF CONTEXT</p><h1>Notice. Tap.<br>Carry on.</h1><p>No perfect record needed.<br>Just the moments you want to remember.</p></div>
+        <div class="quick-tags" aria-label="Log an event now">
+          <button data-quick="activity"><span class="tag-icon activity">↗</span><span>Activity</span><small>movement, your way</small></button>
+          <button data-quick="stress"><span class="tag-icon stress">≈</span><span>Stress</span><small>a little context</small></button>
+          <button data-quick="other"><span class="tag-icon other">＋</span><span>Other</span><small>anything else</small></button>
+        </div>
+        <button class="text-button" id="earlier-button">＋ Add a note or earlier event</button>
+        <article id="today-focus" class="card"></article>
+        <div class="section-heading"><h2>Your rhythm</h2><a id="display-link" href="/rhythm">open display ↗</a></div>
+        <div class="mini-orbit"><canvas id="pocket-orbit" width="800" height="800" aria-label="Current seven-day glucose rhythm"></canvas><div class="mini-centre"><strong id="mini-mean">—</strong><span>7-day mean · mmol/L</span></div></div>
+        <div class="legend"><span><i class="legend-current"></i>this week</span><span><i class="legend-previous"></i>previous</span><span>arcs = out-of-range frequency</span></div>
+        <div class="section-heading"><h2>Recent moments</h2><span id="event-count">0 / 20</span></div>
+        <div id="events" class="event-list"></div>
+        <p class="fineprint">Only the latest 20 events, up to 28 days old, stay on the Pi. Habit check-ins are separate. Missing a tag says nothing about your day.</p>
+      </section>
+      <section id="tab-focus" class="phone-tab" hidden>
+        <div class="intro-copy"><p class="eyebrow">ORBIT FOCUS</p><h1>One small focus.<br>A little curiosity.</h1><p>You choose the habit.<br>We keep the thread.</p></div>
+        <article class="card guide-card"><p class="eyebrow" id="guide-source">LOCAL GUIDE · NOT AI</p><p id="guide-question">Loading your patterns…</p><label class="consent" id="coach-consent-label"><input type="checkbox" id="coach-consent">For this request, share aggregate pattern counts and habit completion counts with OpenAI. No raw readings or notes.</label><button id="coach-button" class="text-button">Ask for a gentler reflection</button><small id="ai-status"></small></article>
+        <div id="active-focus"></div>
+        <div id="focus-options"><div class="section-heading"><h2>Periods worth noticing</h2></div><p class="fineprint">Suggestions need at least 3 affected days. A covered day needs 70% of the selected window. This identifies when, not why.</p><div id="candidates"></div><button id="custom-focus" class="secondary">Choose my own period</button></div>
+        <form id="focus-form" class="card" hidden>
+          <h2>Make it yours.</h2><div class="field-pair"><label>From<select id="focus-start"></select></label><label>To<select id="focus-end"></select></label></div>
+          <label>Your habit<input id="habit" maxlength="120" placeholder="e.g. Notice how lunch fits my afternoon" required></label>
+          <div class="habit-suggestions"><button type="button" data-habit="Simply observe this period">Simply observe</button><button type="button" data-habit="Log activity around this period">Log activity</button><button type="button" data-habit="Notice stress around this period">Notice stress</button></div>
+          <p class="fineprint">One focus, seven days. No treatment advice, scores or promises. The baseline is saved now so it cannot shift during your review.</p><button class="primary" type="submit">Start my focus</button><button type="button" id="focus-cancel" class="text-button">Not now</button>
+        </form>
+      </section>
+      <section id="tab-food" class="phone-tab" hidden>
+        <div class="intro-copy"><p class="eyebrow">FOOD NOTES · EXPERIMENTAL</p><h1>A second look<br>at your plate.</h1><p>A rough draft, not a dose.<br>You check the ingredients and portion.</p></div>
+        <article class="card">
+          <label class="photo-picker" for="food-photo"><span>＋</span><strong>Take or choose a photo</strong><small>Nothing is uploaded automatically</small></label><input id="food-photo" type="file" accept="image/*" capture="environment" class="visually-hidden"><img id="food-preview" alt="Your chosen meal, kept on this phone until you request analysis" hidden>
+          <label>What do you know about the portion?<textarea id="food-portion" maxlength="240" placeholder="e.g. 150 g cooked rice, tofu and vegetables. Sauce unknown."></textarea></label>
+          <label class="consent"><input id="food-consent" type="checkbox">Send this resized photo and portion note to OpenAI for this request. Sugar Orbits will not retain the photo.</label><button id="food-analyse" class="secondary">Get an editable draft</button><p id="food-ai-status" class="fineprint"></p>
+          <div id="food-draft" aria-live="polite"></div>
+        </article>
+        <article class="card"><p class="eyebrow">LABEL + WEIGHT · NO AI</p><h2>Have a label? Use that.</h2><div class="field-pair"><label>Portion weight · g<input id="portion-weight" type="number" min="0" max="5000" step="any" inputmode="decimal"></label><label>Carbs per 100 g<input id="carbs-density" type="number" min="0" max="100" step="any" inputmode="decimal"></label></div><p id="label-result" class="calculation">— g carbohydrate</p><button id="use-label" class="text-button">Use this calculation below</button><p class="fineprint">Match the label's basis: cooked vs dry weight, and the actual amount eaten. No automatic fibre subtraction.</p></article>
+        <form id="food-save" class="card"><h2>Your checked food note</h2><label>Food / note<input id="food-note" maxlength="160" placeholder="A short description"></label><label>Carbohydrate grams you independently checked<input id="confirmed-carbs" type="number" min="0" max="500" step="any" inputmode="decimal" required></label><label class="consent"><input id="carbs-checked" type="checkbox" required>I checked the portion and carbohydrate amount. I am not relying only on a photo estimate.</label><button class="primary">Save food event</button><p class="fineprint">Photo estimates can be substantially wrong, especially for hidden ingredients and portion size. No insulin doses or pump-setting changes are calculated here.</p></form>
+      </section>
+    </main>
+    <details class="privacy"><summary>Privacy & connection</summary><p>Events, focus and check-ins are stored on your Pi. Only explicitly requested cloud features leave the device. Provider retention policies may still apply even though API response storage is disabled.</p><p>Use trusted Wi-Fi for the local preview. For encrypted access, offline app-shell support and eventual notifications, use a private HTTPS connection. Do not forward the Pi's port to the internet.</p><p>Seven-day reviews appear when you next open the app. There are no background push notifications in this build.</p><p>In Safari: Share → Add to Home Screen. For access while away, a private HTTPS/VPN setup is a separate step.</p><button id="clear-pending" class="text-button">Clear this phone's unsent events</button></details>
+    <footer class="phone-footer">A companion for reflection.<br>Keep Dexcom for readings, alerts and treatment decisions.</footer>
+  </div>
+  <nav class="phone-nav" aria-label="Companion pages"><button data-tab="log" class="active"><span>◌</span>Log</button><button data-tab="focus"><span>⌁</span>Focus<span id="review-dot" class="review-dot" hidden></span></button><button data-tab="food"><span>▧</span>Food</button></nav>
+  <dialog id="event-dialog"><form id="event-form"><p class="eyebrow">A LITTLE MORE CONTEXT</p><h2>Mark a moment.</h2><label>Kind<select id="event-kind"><option value="activity">Activity</option><option value="stress">Stress</option><option value="other">Other</option></select></label><label>When<input id="event-at" type="datetime-local" required></label><label>Optional note<input id="event-note" maxlength="160" placeholder="Just a few words"></label><button class="primary">Save moment</button><button id="event-cancel" class="text-button" type="button">Cancel</button></form></dialog>
+  <div id="toast" class="toast" role="status" hidden><span id="toast-text"></span><button id="toast-undo" hidden>Undo</button></div>
+</body>
+</html>

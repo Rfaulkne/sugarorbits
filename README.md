@@ -6,6 +6,22 @@ Building the round unit or designing its enclosure? See the **[hardware BOM and 
 
 Exploring a simpler non-touch build? See the **[Low-Cost E-Paper Edition](docs/LOW_COST_EPAPER.md)**.
 
+## Orbit Focus v2 prototype — optional new interface
+
+The existing round interface remains at `/`. A separate prototype adds:
+
+- `/rhythm`: weekly mean / previous-week ghost, recurring high-low frequency,
+  current-time wedge, seven individual rings, event satellites, and a habit-focus arc.
+- `/phone`: an iPhone companion for one-tap activity/stress/other tags, confirmed
+  food notes, one user-chosen seven-day habit, check-ins, and a weekly reflection.
+- Optional cloud reflection wording and experimental food-photo drafts. These are
+  disabled by default; the local guide, logs, and check-ins need no AI key.
+
+**[Read the setup, privacy, calculation and test notes](docs/ORBIT_FOCUS_V2.md).**
+This is a prototype, not a deployed update on your Pi. Physical Pi and iPhone
+Safari verification is still required. No notification or remote-access service
+is configured automatically.
+
 Sugar Orbits turns four rolling weeks of personal Dexcom G7 readings into
 artistic seven-day radial glucose portraits. Each orbit is one day, time runs
 clockwise, and the glucose curve deforms the ring. The Trends view reveals
