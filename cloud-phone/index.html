@@ -35,16 +35,21 @@
       <p class="hint">Logging works now. Data-connected coaching and check-ins are the next stage, not active in this build.</p>
     </section>
     <section id="panel-food" hidden>
-      <h2>A second look at your plate.</h2><p>Photo. Confirm the food. Tell us how much.</p>
-      <label class="photo-label" for="photo">＋ Take or choose a photo</label><input id="photo" type="file" accept="image/*" capture="environment">
+      <h2>A second look at your plate.</h2><p>Scan it. Say it. Or tap a staple.</p>
+      <div class="food-actions"><button id="scan-now">◎ Scan now</button><button id="text-food" class="secondary">Say / type</button></div>
+      <div class="staples-head"><h3>Your staples</h3><button id="manage-staples" class="quiet">Edit</button></div><div id="staples" class="staples"></div>
+      <p class="hint">Favourites save food names and usual portions on this device, separately per account—not carb estimates. They do not sync yet.</p>
+      <details><summary class="quiet">Or choose an existing photo</summary><input id="photo" type="file" accept="image/*" capture="environment"></details>
       <img id="photo-preview" alt="Your selected meal" hidden>
       <p class="hint">Only when you ask: a resized photo is sent to OpenAI. Sugar Orbits does not save it; provider retention policies may apply.</p>
       <label class="consent"><input id="food-consent" type="checkbox">I agree to send this photo, confirmed foods and portion to OpenAI for the requests I make below.</label>
-      <button id="identify" disabled>Identify food with AI</button>
+      <button id="identify" disabled hidden>Identify food with AI</button>
       <div id="food-confirm" hidden>
         <label>Is this right? Correct anything missed.<textarea id="foods" maxlength="500" rows="3"></textarea></label>
         <label>How much will you eat?<input id="portion" maxlength="300" placeholder="e.g. 150 g cooked rice and half the tofu"></label>
+        <p class="hint">Prefer speaking? Tap the microphone on your iPhone keyboard. Include cooked or dry weight where relevant.</p>
         <button id="estimate">Confirm foods & estimate carbs</button>
+        <button id="save-staple" class="quiet">☆ Save as a staple</button>
       </div>
       <div id="food-result" class="card" aria-live="polite" hidden><p class="eyebrow">ROUGH CARBOHYDRATE ESTIMATE</p><strong id="carbs"></strong><p id="food-question"></p><ul id="assumptions"></ul><p class="hint">Photos and portions can be misread. Independently check ingredients and quantity. Do not use this estimate alone for insulin decisions. This draft is not saved as a food event.</p></div>
       <button id="clear-photo" class="quiet">Clear photo & draft</button>
@@ -57,4 +62,5 @@
   <div id="toast" role="status" aria-live="polite" hidden><span id="toast-label"></span><button id="undo" class="quiet">Undo</button></div>
   <footer>Made for reflection.<br>Keep Dexcom for readings, alerts and treatment decisions.</footer>
 </main>
+<dialog id="camera-dialog" aria-labelledby="camera-title"><h2 id="camera-title">Frame your meal</h2><p>Capture first. Nothing is sent automatically.</p><video id="camera" autoplay playsinline muted></video><p id="camera-status" role="status"></p><div class="food-actions"><button id="shutter" disabled>Capture</button><button id="camera-cancel" class="quiet">Cancel</button></div></dialog>
 </html>
