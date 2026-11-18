@@ -1,0 +1,29 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const elements=new Map(),calls=[],timers=[];
+function el(){return {hidden:false,value:'',checked:false,textContent:'',disabled:false,dataset:{},children:[],classList:{add(){},remove(){}},append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]}}}
+const get=id=>{if(!elements.has(id))elements.set(id,el());return elements.get(id)};
+const tags=['activity','stress','other'].map(kind=>Object.assign(el(),{dataset:{kind}}));
+const tabs=['log','coach','food'].map(tab=>Object.assign(el(),{dataset:{tab}}));
+const context={document:{getElementById:get,querySelectorAll:s=>s==='[data-kind]'?tags:s==='[data-tab]'?tabs:[...elements.values(),...tags,...tabs],createElement:el},window:{URL},crypto:require('node:crypto').webcrypto,AbortSignal,Date,Error,JSON,Math,encodeURIComponent,
+ setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length},clearTimeout(){},
+ fetch:async(url,opt)=>{calls.push({url,opt});let data=null;
+ if(url.includes('grant_type=password'))data={access_token:'test-token',expires_at:Date.now()/1000+3600};
+ else {assert.equal(opt.headers.Authorization,'Bearer test-token');if(url.includes('/functions/'))data={foods:['rice'],carbs_low_g:30,carbs_high_g:50,question:'',assumptions:['Portion supplied.']};}
+ return {ok:true,text:async()=>data?JSON.stringify(data):''};}};
+vm.runInNewContext(fs.readFileSync('cloud-phone/app.js','utf8'),context);
+const settle=()=>new Promise(r=>setImmediate(r));
+(async()=>{
+ get('email').value='test@example.invalid';get('password').value='mock-password';get('login-form').onsubmit({preventDefault(){}});await settle();
+ assert.equal(get('password').value,'');assert.equal(get('moments').hidden,false);
+ tags[0].onclick();await settle();assert.equal(get('toast-label').textContent,'Logged ✓');assert.equal(get('toast').hidden,false);
+ assert.equal(calls.filter(x=>x.opt.method==='POST'&&x.url.includes('/orbit_events')).length,1);
+ assert.equal(calls.some(x=>x.url.includes('select=')),false);
+ get('undo').onclick();await settle();assert.ok(calls.some(x=>x.opt.method==='DELETE'));assert.equal(get('toast-label').textContent,'Removed ✓');
+ tabs[2].onclick();assert.equal(get('panel-food').hidden,false);assert.equal(get('panel-log').hidden,true);
+ get('foods').value='rice';get('portion').value='150g cooked';get('estimate').onclick();await settle();assert.equal(calls.filter(x=>x.url.includes('/functions/')).length,0);
+ get('food-consent').checked=true;get('estimate').onclick();await settle();assert.equal(get('carbs').textContent,'30–50 g');assert.equal(get('food-result').hidden,false);
+ const call=calls.find(x=>x.url.includes('/functions/'));assert.equal(JSON.parse(call.opt.body).mode,'estimate');assert.equal(JSON.parse(call.opt.body).consent,true);
+ get('portion').oninput();assert.equal(get('food-result').hidden,true);
+ get('logout').onclick();await settle();assert.equal(get('moments').hidden,true);assert.equal(get('foods').value,'');assert.equal(get('carbs').textContent,'');
+ console.log('PASS: mocked login, tag/Undo, no list reads, tabs, consent gate, estimate request/result, stale draft clearing and logout cleanup. No live requests.');
+})().catch(e=>{console.error(e);process.exitCode=1});
