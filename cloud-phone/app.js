@@ -11,6 +11,7 @@
   let image = null, photoGeneration = 0, undoId = null, toastTimer, fadeTimer;
   let cameraStream=null,cameraGeneration=0,editingStaples=false;
   let rhythmRows=[],rhythmEvents=[],rhythmState=null,orbit=null;
+  let chosenSuggestion=null;
   const R=window.OrbitRhythm;
   const say = text => { $('status').textContent = text; };
   async function request(path, options = {}, token) {
@@ -47,6 +48,7 @@
     for(const id of ['focus-title','focus-habit-copy','focus-progress','focus-comparison','focus-review-date','focus-checkin-status'])$(id).textContent='';
     $('rhythm-range').textContent='—';$('rhythm-coverage').textContent='Loading your recorded rhythm…';
     if(orbit)orbit.draw(null);renderFocus();
+    resetCoach();
     $('dexcom-value').textContent='—';$('dexcom-unit').hidden=true;$('dexcom-time').textContent='';$('dexcom-sync-time').textContent='';$('dexcom-status').textContent='No readings checked yet.';
   }
   function toast(text,id=null) {
@@ -156,6 +158,8 @@
   }
   function renderFocus(){
     const f=readFocus();$('focus-plan').hidden=!!f;$('focus-thread').hidden=!f;
+    $('coach-new-options').hidden=!!f;$('coach-active-note').hidden=!f;
+    $('coach-suggestions').hidden=!!f;
     $('focus-window-label').hidden=$('focus-kind').value==='activity';
     if(!f){$('home-focus-title').textContent='What would you like to notice?';$('home-focus-description').textContent='Choose one period or explore tagged activity.';return;}
     const elapsed=Math.floor((Date.now()-f.started)/864e5),review=elapsed>=7;
@@ -173,17 +177,56 @@
     const enough=base?.eligible>=5&&current?.eligible>=5;
     $('focus-comparison').textContent=(enough?'Both periods have at least five covered windows. These are descriptive observations, not evidence that your experiment caused a change.':'Comparison is provisional: at least five covered windows in each period are needed before interpreting a change.')+(f.kind==='activity'?' Activity means the two hours after a tag; overlapping tags are combined. Untagged activity is unknown.':' Only complete three-hour windows with at least 70% sample coverage are counted.');
   }
-  $('focus-kind').onchange=()=>{$('focus-window-label').hidden=$('focus-kind').value==='activity';};
+  function resetCoach(){chosenSuggestion=null;$('coach-consent').checked=false;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
+  const candidateTitle=c=>c.kind==='activity'?'Around tagged activity':`${c.kind==='high'?'Above':'Below'} range · ${clock(c.start)}–${clock(c.end)}`;
+  function validateChoice(c){
+    const validFraction=n=>n===null||typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=1;
+    return c&&['high','low','activity'].includes(c.kind)&&typeof c.id==='string'&&typeof c.question==='string'&&c.question.length>0&&c.question.length<=240&&
+      (c.kind==='activity'?c.id==='activity'&&c.start===0&&c.end===1440:Number.isInteger(c.start)&&c.start>=0&&c.start<=1260&&c.start%180===0&&c.end===c.start+180&&c.id===c.kind+'-'+c.start)&&
+      [c.current,c.previous].every(m=>m&&Number.isInteger(m.eligible)&&m.eligible>=0&&m.eligible<=20&&[m.above,m.below,m.in_range].every(validFraction))&&c.current.eligible>=3;
+  }
+  $('coach-find').onclick=()=>run(async()=>{
+    if(readFocus())throw new Error('Finish the current focus before choosing another.');
+    if(!$('coach-consent').checked){$('coach-status').textContent='Confirm sharing summaries for this request first.';return;}
+    $('coach-status').textContent='Checking coverage and preparing a few choices…';$('coach-suggestions').replaceChildren();chosenSuggestion=null;$('selected-focus-note').hidden=true;
+    try{
+      const result=await request('/functions/v1/orbit-coach',{method:'POST',body:JSON.stringify({consent:true})},await access());
+      $('coach-consent').checked=false;
+      if(['insufficient_data','stale_data'].includes(result.mode)){$('coach-status').textContent=result.message||'Not enough recent covered data yet. You can choose an observation yourself.';return;}
+      const generated=Date.parse(result.generated_at),choices=result.suggestions;
+      if(result.mode!=='ai_assisted'||!Number.isFinite(generated)||generated>Date.now()+60000||Date.now()-generated>15*60000||!Array.isArray(choices)||choices.length<1||choices.length>3||!choices.every(validateChoice)||new Set(choices.map(c=>c.id)).size!==choices.length)throw new Error('The AI choices could not be validated. Nothing was selected.');
+      $('coach-status').textContent='AI-assisted choices, backed by calculated observations. Choose only what feels useful.';
+      for(const c of choices){
+        const card=document.createElement('article');card.className='coach-choice';const title=document.createElement('h3');title.textContent=candidateTitle(c);
+        const question=document.createElement('p');question.textContent=c.question;const facts=document.createElement('p');facts.className='hint';
+        const affected=c.kind==='high'?c.current.affected_high_days:c.current.affected_low_days;
+        facts.textContent=(c.kind==='activity'?`${c.current.eligible} covered tagged windows`: `${Number.isInteger(affected)?affected:'—'} of ${c.current.eligible} covered days affected`)+` · ${pct(c.current.in_range)} in range · ${pct(c.current.above)} above · ${pct(c.current.below)} below.`+(c.preliminary?' Preliminary coverage.':'');
+        const reference=document.createElement('p');reference.className='hint';reference.textContent=c.previous.eligible>=3?`Preceding period: ${c.previous.eligible} covered windows · ${pct(c.previous.in_range)} in range. This is context, not a causal comparison.`:'Preceding period has too few covered windows for a useful comparison.';
+        const choose=document.createElement('button');choose.textContent='Choose this focus';choose.onclick=()=>{if(busy)return;
+          if(Date.now()-generated>15*60000){$('coach-status').textContent='These choices are over 15 minutes old. Request a fresh review.';return;}
+          chosenSuggestion={id:c.id,kind:c.kind,start:c.kind==='activity'?0:c.start,generated};$('focus-kind').value=c.kind;$('focus-window').value=String(c.kind==='activity'?0:c.start);$('focus-window-label').hidden=c.kind==='activity';
+          $('selected-focus-note').textContent='Chosen: '+candidateTitle(c)+'. Now describe what you want to try or observe.';$('selected-focus-note').hidden=false;$('focus-plan').scrollIntoView?.({behavior:'smooth',block:'start'});
+        };
+        card.append(title,question,facts,reference,choose);$('coach-suggestions').append(card);
+      }
+    }catch(error){$('coach-status').textContent=error.message;throw error;}finally{$('coach-consent').checked=false;}
+  });
+  const clearSelection=()=>{chosenSuggestion=null;$('selected-focus-note').hidden=true;};
+  $('focus-kind').onchange=()=>{clearSelection();$('focus-window-label').hidden=$('focus-kind').value==='activity';};
+  $('focus-window').onchange=clearSelection;
   $('focus-plan').onsubmit=event=>{event.preventDefault();run(async()=>{
     if(readFocus())throw new Error('Finish the current focus before starting another.');
     const habit=$('focus-habit').value.trim();if(!habit)throw new Error('Describe one thing you will try or observe.');
+    if(chosenSuggestion){if(Date.now()-chosenSuggestion.generated>15*60000)throw new Error('Request fresh AI choices before starting this focus.');await loadRhythm();}
     const f={started:Date.now(),kind:$('focus-kind').value,start:Number($('focus-window').value),habit,checkins:{}};
-    f.baseline=focusMetrics(f,true);saveFocus(f);toast('Focus saved on this phone ✓');
+    f.baseline=focusMetrics(f,true);
+    if(chosenSuggestion){if(!f.baseline||f.baseline.eligible<3)throw new Error('The latest baseline has insufficient coverage. Request a fresh review.');f.suggestion_id=chosenSuggestion.id;}
+    saveFocus(f);resetCoach();toast('Focus saved on this phone ✓');
   });};
   function checkIn(status){const f=readFocus();if(!f)return;const date=R?R.local(Date.now()).date:new Date().toISOString().slice(0,10);f.checkins=f.checkins||{};f.checkins[date]={status:status||f.checkins[date]?.status||'note',note:$('focus-note').value.slice(0,240)};saveFocus(f);toast('Check-in saved ✓');}
   document.querySelectorAll('[data-checkin]').forEach(b=>b.onclick=()=>run(async()=>checkIn(b.dataset.checkin)));
   $('save-focus-note').onclick=()=>run(async()=>checkIn(null));
-  $('finish-focus').onclick=()=>run(async()=>{const key=focusKey();if(key)localStorage.removeItem(key);renderFocus();toast('Focus cleared from this phone');});
+  $('finish-focus').onclick=()=>run(async()=>{const key=focusKey();if(key)localStorage.removeItem(key);resetCoach();renderFocus();toast('Focus cleared from this phone');});
   function paintRhythm(){
     if(!R||!session)return;rhythmState=R.summarize(rhythmRows,rhythmEvents);
     $('rhythm-range').textContent=pct(rhythmState.rangeFraction);

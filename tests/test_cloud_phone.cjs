@@ -1,6 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map(),calls=[],timers=[],storage=new Map();
 let glucoseRows=[],syncRows=[],historyRows=[];
+let coachResponse={mode:'insufficient_data',suggestions:[],message:'Not enough covered days yet.'};
 function el(){return {hidden:false,value:'',checked:false,textContent:'',disabled:false,dataset:{},children:[],open:false,videoWidth:640,videoHeight:480,showModal(){this.open=true},close(){this.open=false},play:async()=>{},getContext(){return {drawImage(){},fillRect(){}}},toDataURL(){return 'data:image/jpeg;base64,/9j/AA=='},classList:{add(){},remove(){}},append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]}}}
 const get=id=>{if(!elements.has(id))elements.set(id,el());return elements.get(id)};
 const tags=['activity','stress','other'].map(kind=>Object.assign(el(),{dataset:{kind}}));
@@ -16,6 +17,7 @@ const context={document:{getElementById:get,querySelectorAll:s=>s==='[data-kind]
  else if(url.includes('/rest/v1/orbit_glucose?'))data=glucoseRows;
  else if(url.includes('/rest/v1/orbit_glucose_sync?'))data=syncRows;
  else if(url.includes('/functions/v1/dexcom-sync')){glucoseRows=[{recorded_at:new Date().toISOString(),value_mg_dl:126}];syncRows=[{succeeded_at:new Date().toISOString(),error_code:null}];data={ok:true,received:1};}
+ else if(url.includes('/functions/v1/orbit-coach'))data=coachResponse;
  else if(url.includes('/functions/'))data={foods:['rice'],carbs_low_g:30,carbs_high_g:50,question:'',assumptions:['Portion supplied.']};}
  return {ok:true,text:async()=>data?JSON.stringify(data):''};}};
 vm.runInNewContext(fs.readFileSync('cloud-phone/app.js','utf8'),context);
@@ -30,6 +32,15 @@ const settle=()=>new Promise(r=>setImmediate(r));
  get('undo').onclick();await settle();assert.ok(calls.some(x=>x.opt.method==='DELETE'));assert.equal(get('toast-label').textContent,'Removed ✓');
  tabs[2].onclick();assert.equal(get('panel-food').hidden,false);assert.equal(get('panel-rhythm').hidden,true);
  get('home-focus').onclick();assert.equal(get('panel-focus').hidden,false);get('focus-kind').value='high';get('focus-window').value='720';get('focus-habit').value='Notice afternoons';get('focus-plan').onsubmit({preventDefault(){}});await settle();assert.equal(get('focus-thread').hidden,false);assert.ok(storage.has('orbit-focus-phone-v1:test-owner'));checks[0].onclick();await settle();assert.ok(get('focus-checkin-status').textContent.includes('Tried it'));get('focus-note').value='A busy day';get('save-focus-note').onclick();await settle();assert.equal(JSON.parse(storage.get('orbit-focus-phone-v1:test-owner')).habit,'Notice afternoons');get('finish-focus').onclick();await settle();assert.equal(get('focus-thread').hidden,true);tabs[2].onclick();
+ // AI suggestions require per-request consent, never appear automatically.
+ get('coach-find').onclick();await settle();assert.equal(calls.filter(x=>x.url.includes('/orbit-coach')).length,0);
+ get('coach-consent').checked=true;get('coach-find').onclick();await settle();assert.equal(get('coach-status').textContent,'Not enough covered days yet.');assert.equal(get('coach-consent').checked,false);
+ coachResponse={mode:'ai_assisted',generated_at:new Date().toISOString(),suggestions:[{id:'high-720',kind:'high',start:720,end:900,question:'Would you like to explore this period?',current:{eligible:3,above:1,below:0,in_range:0,affected_high_days:3,affected_low_days:0},previous:{eligible:0,above:null,below:null,in_range:null},preliminary:true}]};
+ get('coach-consent').checked=true;get('coach-find').onclick();await settle();assert.equal(get('coach-suggestions').children.length,1);get('coach-suggestions').children[0].children[4].onclick();assert.equal(get('focus-kind').value,'high');assert.equal(get('focus-window').value,'720');assert.equal(get('selected-focus-note').hidden,false);
+ const choiceCall=calls.find(x=>x.url.includes('/orbit-coach'));assert.deepEqual(JSON.parse(choiceCall.opt.body),{consent:true});
+ historyRows=[];for(let d=1;d<=3;d++){const start=new Date(Date.now()-d*864e5);start.setUTCHours(11,0,0,0);for(let n=0;n<36;n++)historyRows.push({recorded_at:new Date(start.getTime()+n*300000).toISOString(),value_mg_dl:216});}historyRows.sort((a,b)=>a.recorded_at.localeCompare(b.recorded_at));
+ get('focus-habit').value='Observe this period';get('focus-plan').onsubmit({preventDefault(){}});await settle();assert.equal(get('focus-thread').hidden,false);assert.equal(JSON.parse(storage.get('orbit-focus-phone-v1:test-owner')).suggestion_id,'high-720');assert.equal(get('coach-new-options').hidden,true);get('finish-focus').onclick();await settle();historyRows=[];
+ coachResponse={mode:'ai_assisted',generated_at:new Date().toISOString(),suggestions:[{id:'invented'}]};get('coach-consent').checked=true;get('coach-find').onclick();await settle();assert.ok(get('coach-status').textContent.includes('could not be validated'));assert.equal(get('coach-suggestions').children.length,0);
  assert.equal(get('staples').children.length,2);get('staples').children[0].children[0].onclick();assert.equal(get('foods').value,'Rice (cooked)');assert.equal(get('portion').value,'100 g cooked');assert.equal(get('food-confirm').hidden,false);
  get('text-food').onclick();assert.equal(get('foods').value,'');assert.equal(get('food-confirm').hidden,false);
  get('foods').value='My bread';get('portion').value='2 slices';get('save-staple').onclick();assert.ok(storage.has('orbit-staples-v1:test-owner'));assert.equal(get('staples').children.length,3);
@@ -38,9 +49,9 @@ const settle=()=>new Promise(r=>setImmediate(r));
  let stopped=0;context.navigator.mediaDevices={getUserMedia:async()=>({getTracks:()=>[{stop(){stopped++}}]})};
  const beforeCameraCalls=calls.length;await get('scan-now').onclick();assert.equal(get('camera-dialog').open,true);get('shutter').onclick();assert.equal(get('camera-dialog').open,false);assert.equal(stopped,1);assert.equal(get('photo-preview').hidden,false);assert.equal(get('identify').hidden,false);assert.equal(calls.length,beforeCameraCalls);
  let release;context.navigator.mediaDevices.getUserMedia=()=>new Promise(resolve=>{release=resolve});const opening=get('scan-now').onclick();get('camera-cancel').onclick();release({getTracks:()=>[{stop(){stopped++}}]});await opening;assert.equal(stopped,2);assert.equal(get('camera-dialog').open,false);
- get('foods').value='rice';get('portion').value='150g cooked';get('estimate').onclick();await settle();assert.equal(calls.filter(x=>x.url.includes('/functions/')).length,0);
+ get('foods').value='rice';get('portion').value='150g cooked';get('estimate').onclick();await settle();assert.equal(calls.filter(x=>x.url.includes('/food-genie')).length,0);
  get('food-consent').checked=true;get('estimate').onclick();await settle();assert.equal(get('carbs').textContent,'30–50 g');assert.equal(get('food-result').hidden,false);
- const call=calls.find(x=>x.url.includes('/functions/'));assert.equal(JSON.parse(call.opt.body).mode,'estimate');assert.equal(JSON.parse(call.opt.body).consent,true);
+ const call=calls.find(x=>x.url.includes('/food-genie'));assert.equal(JSON.parse(call.opt.body).mode,'estimate');assert.equal(JSON.parse(call.opt.body).consent,true);
  get('portion').oninput();assert.equal(get('food-result').hidden,true);
  const yesterday=Date.now()-864e5;historyRows=[126,126,216,126,54].map((value_mg_dl,i)=>({recorded_at:new Date(yesterday+i*300000).toISOString(),value_mg_dl}));
  get('dexcom-sync').onclick();await settle();assert.equal(get('dexcom-value').textContent,'7.0');assert.equal(get('dexcom-unit').hidden,false);assert.ok(get('dexcom-status').textContent.includes('Recent stored'));
