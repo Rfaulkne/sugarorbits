@@ -31,7 +31,7 @@
   function applyCloud(result){if(!Array.isArray(result?.plans))throw Error('Unexpected cloud focus response.');cloudPlans=result.plans;cloudReady=true;cloudKnown=true;focusFacts=null;renderFocus();renderKept();}
   async function loadCloudFocus(){
     const current=generation;
-    try{const result=await focusCall({action:'list'});if(current!==generation)return;cloudConfig=result;applyCloud(result);$('cloud-focus-status').textContent='Cloud focus connected. Plans and check-ins expire 28 days after the plan began.';
+    try{const result=await focusCall({action:'list'});if(current!==generation)return;cloudConfig=result;applyCloud(result);$('cloud-focus-status').textContent=result.tag_focus_version===2?'Cloud focus connected · activity & stress supported.':'Cloud focus connected. Update orbit-focus to enable stress tracking.';
       $('move-local-focus').hidden=!!readFocus()||!readLocalFocus();
     }catch{if(current!==generation)return;cloudReady=false;$('cloud-focus-status').textContent=cloudKnown?'Cloud focus is unavailable. Your last loaded plan is visible; saving is paused. Refresh before making changes.':'Cloud focus setup is pending. Existing device-only plans still work; reminders and cloud coaching are not active yet.';}
   }

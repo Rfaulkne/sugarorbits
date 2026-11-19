@@ -90,7 +90,7 @@ const settle=()=>new Promise(r=>setImmediate(r));
  assert.equal(get('staples').children.length,0);
  // New cloud setup: shared plan, explicit remembered session, check-in, review and maintenance.
  cloudEnabled=true;get('remember-device').checked=true;get('email').value='test@example.invalid';get('password').value='mock';get('login-form').onsubmit({preventDefault(){}});await settle();
- assert.ok(storage.has('orbit-personal-session-v1'));assert.ok(get('cloud-focus-status').textContent.includes('Cloud focus connected'));
+ assert.ok(storage.has('orbit-personal-session-v1'));assert.ok(get('cloud-focus-status').textContent.includes('activity & stress supported'));
  get('focus-kind').value='high';get('focus-window').value='720';get('focus-habit').value='Notice routines';get('focus-plan').onsubmit({preventDefault(){}});await settle();
  assert.ok(get('focus-review-date').textContent.includes('private cloud'));assert.equal(cloudRecords[0].plan.habit,'Notice routines');
  checks[0].onclick();await settle();assert.ok(cloudCalls.some(c=>c.action==='checkin'));
