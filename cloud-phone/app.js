@@ -40,6 +40,7 @@
     $('login').hidden = !!session; $('moments').hidden = !session;
     $('toast').hidden=true;undoId=null;clearPhoto();
     editingStaples=false;renderStaples();
+    $('dexcom-value').textContent='—';$('dexcom-unit').hidden=true;$('dexcom-time').textContent='';$('dexcom-sync-time').textContent='';$('dexcom-status').textContent='No readings checked yet.';
   }
   function toast(text,id=null) {
     clearTimeout(toastTimer);clearTimeout(fadeTimer);undoId=id;
@@ -117,6 +118,7 @@
     const password=$('password').value;$('password').value='';
     session=await request('/auth/v1/token?grant_type=password', {method:'POST',body:JSON.stringify({email:$('email').value.trim(),password})});
     generation++;showSession();say('Connected.');
+    try{await refreshDexcom();}catch{$('dexcom-status').textContent='Could not load glucose status. Open Coach and try Refresh status.';}
   });};
   document.querySelectorAll('[data-kind]').forEach(button=>button.onclick=()=>run(async()=>{
     const id=crypto.randomUUID();
@@ -127,6 +129,38 @@
   document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{
     for(const tab of ['log','coach','food'])$('panel-'+tab).hidden=tab!==button.dataset.tab;
     document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));say('');
+  });
+  const friendlySyncErrors={share_auth_failed:'Dexcom login failed. Check your saved credentials, region and Share setup.',share_unavailable:'Dexcom Share was unavailable.',no_readings:'Share returned no recent readings.',invalid_readings:'An unexpected value or timestamp was rejected.',storage_error:'Cloud storage setup needs checking.',connection_failed:'The collector could not connect.',session_expired:'The Share session could not be renewed.'};
+  async function refreshDexcom(){
+    const current=generation,token=await access();
+    const [rows,states]=await Promise.all([
+      request('/rest/v1/orbit_glucose?select=recorded_at,value_mg_dl&order=recorded_at.desc&limit=1',{},token),
+      request('/rest/v1/orbit_glucose_sync?select=succeeded_at,error_code&limit=1',{},token)
+    ]);
+    if(current!==generation)return;
+    if(!Array.isArray(rows)||!Array.isArray(states))throw new Error('Unexpected glucose status response.');
+    const row=rows[0],state=states[0];
+    $('dexcom-value').textContent='—';$('dexcom-unit').hidden=true;$('dexcom-time').textContent='';
+    const succeeded=Date.parse(state?.succeeded_at);
+    $('dexcom-sync-time').textContent=Number.isFinite(succeeded)?'Last successful fetch: '+new Date(succeeded).toLocaleString():'';
+    if(!row){$('dexcom-status').textContent=state?.error_code?(friendlySyncErrors[state.error_code]||'Last fetch failed. Try again later.'):'No cloud readings yet. Tap Fetch Dexcom data.';return;}
+    const stamp=Date.parse(row.recorded_at),value=Number(row.value_mg_dl);
+    if(!Number.isFinite(stamp)||!Number.isFinite(value)||value<20||value>600||stamp>Date.now()+5*60000){$('dexcom-status').textContent='Stored value or timestamp needs verification. No value displayed.';return;}
+    const stale=Date.now()-stamp>15*60000;
+    $('dexcom-value').textContent=(value/18).toFixed(1);$('dexcom-unit').hidden=false;
+    $('dexcom-time').textContent='Reading time: '+new Date(stamp).toLocaleString();
+    $('dexcom-status').textContent=(stale?'Older reading—more than 15 minutes old at this check.':'Recent stored reading at this check—compare its time with Dexcom.')+(state?.error_code?' Last fetch failed; this is previously saved data.':'');
+  }
+  $('dexcom-refresh').onclick=()=>run(async()=>{
+    try{await refreshDexcom();say('Status refreshed. No new Dexcom fetch was requested.');}catch(error){$('dexcom-status').textContent='Could not refresh stored glucose status.';throw error;}
+  });
+  $('dexcom-sync').onclick=()=>run(async()=>{
+    $('dexcom-status').textContent='Fetching recent readings from Dexcom Share…';say('');
+    try{
+      const result=await request('/functions/v1/dexcom-sync',{method:'POST',body:'{}'},await access());
+      if(result.ok!==true)throw new Error('The collector did not confirm a successful fetch.');
+      await refreshDexcom();say(`${result.received} recent readings reconciled. Repeated fetches do not add duplicates.`);
+    }catch(error){$('dexcom-status').textContent='Fetch not confirmed: '+(error.name==='TimeoutError'?'The request timed out. Try Refresh status before fetching again.':error.message);throw error;}
   });
   $('photo').onchange=async()=>{
     if(busy)return;

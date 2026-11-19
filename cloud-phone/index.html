@@ -31,7 +31,14 @@
     </section>
     <section id="panel-coach" hidden>
       <h2>One small focus.</h2><p>We’ll look for recurring periods together, then you choose one habit to explore for seven days.</p>
-      <div class="card"><p class="eyebrow">WAITING FOR YOUR PI</p><p>Your glucose summaries are not connected yet. No patterns or coaching conclusions are being generated.</p></div>
+      <div class="card" id="dexcom-card"><p class="eyebrow">DEXCOM CONNECTION TEST</p>
+        <p id="dexcom-status" role="status">Sign in to check stored readings.</p>
+        <strong id="dexcom-value">—</strong><span id="dexcom-unit" hidden> mmol/L · latest stored reading</span>
+        <p id="dexcom-time"></p><p id="dexcom-sync-time" class="hint"></p>
+        <button id="dexcom-sync">Fetch Dexcom data</button><button id="dexcom-refresh" class="quiet">Refresh status</button>
+        <p class="hint">Connection test only. This requests up to the latest 24 hours from Share and stores them privately in your cloud account. No readings are sent to AI. Automatic collection and Pi pairing are not enabled yet.</p>
+      </div>
+      <div class="card"><p class="eyebrow">COACH NOT CONNECTED YET</p><p>First, compare the fetched value and its time with Dexcom. Then we can enable collection and build a reliable seven-day baseline. No patterns or coaching conclusions are being generated here yet.</p></div>
       <p class="hint">Logging works now. Data-connected coaching and check-ins are the next stage, not active in this build.</p>
     </section>
     <section id="panel-food" hidden>
