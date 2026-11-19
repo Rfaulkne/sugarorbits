@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map(),calls=[],timers=[],storage=new Map();
-let glucoseRows=[],syncRows=[],historyRows=[];
+let glucoseRows=[],syncRows=[],historyRows=[],traceHold=null;
 let coachResponse={mode:'insufficient_data',suggestions:[],message:'Not enough covered days yet.'};
 function el(){return {hidden:false,value:'',checked:false,textContent:'',disabled:false,dataset:{},children:[],open:false,videoWidth:640,videoHeight:480,showModal(){this.open=true},close(){this.open=false},play:async()=>{},getContext(){return {drawImage(){},fillRect(){}}},toDataURL(){return 'data:image/jpeg;base64,/9j/AA=='},classList:{add(){},remove(){}},append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]}}}
 const get=id=>{if(!elements.has(id))elements.set(id,el());return elements.get(id)};
@@ -12,6 +12,7 @@ const context={document:{getElementById:get,querySelectorAll:s=>s==='[data-kind]
  fetch:async(url,opt)=>{calls.push({url,opt});let data=null;
  if(url.includes('grant_type=password'))data={access_token:'test-token',expires_at:Date.now()/1000+3600,user:{id:'test-owner'}};
  else {assert.equal(opt.headers.Authorization,'Bearer test-token');
+ if(url.includes('recorded_at=lte.')&&traceHold){const held=traceHold;traceHold=null;return held;}
  if(url.includes('order=recorded_at.asc'))data=url.includes('recorded_at=gt.')?[]:historyRows;
  else if(url.includes('/rest/v1/orbit_events?select='))data=[];
  else if(url.includes('/rest/v1/orbit_glucose?'))data=glucoseRows;
@@ -20,6 +21,7 @@ const context={document:{getElementById:get,querySelectorAll:s=>s==='[data-kind]
  else if(url.includes('/functions/v1/orbit-coach'))data=coachResponse;
  else if(url.includes('/functions/'))data={foods:['rice'],carbs_low_g:30,carbs_high_g:50,question:'',assumptions:['Portion supplied.']};}
  return {ok:true,text:async()=>data?JSON.stringify(data):''};}};
+context.window.OrbitAfterMoment=require('../cloud-phone/after-moment.js');
 vm.runInNewContext(fs.readFileSync('cloud-phone/app.js','utf8'),context);
 const settle=()=>new Promise(r=>setImmediate(r));
 (async()=>{
@@ -29,6 +31,15 @@ const settle=()=>new Promise(r=>setImmediate(r));
  tags[0].onclick();await settle();assert.equal(get('toast-label').textContent,'Logged ✓');assert.equal(get('toast').hidden,false);
  assert.equal(calls.filter(x=>x.opt.method==='POST'&&x.url.includes('/orbit_events')).length,1);
  assert.equal(get('quick-log').hidden,true);get('quick-log-toggle').onclick();assert.equal(get('quick-log').hidden,false);
+ assert.equal(get('after-event').children.length,1);assert.ok(get('after-caption').textContent.includes('Activity'));
+ assert.ok(calls.some(x=>x.url.includes('recorded_at=lte.')));
+ get('after-durations').children[2].onclick();await settle();assert.ok(get('after-caption').textContent.includes('6 hours'));
+ get('after-filters').children[2].onclick();await settle();assert.ok(get('after-status').textContent.includes('No saved stress'));
+ get('after-filters').children[0].onclick();await settle();assert.equal(get('after-event').children.length,1);
+ let releaseTrace;traceHold=new Promise(resolve=>releaseTrace=resolve);get('after-durations').children[0].onclick();await settle();
+ get('after-durations').children[2].onclick();await settle();const newestStatus=get('after-status').textContent;
+ releaseTrace({ok:true,text:async()=>JSON.stringify([{recorded_at:new Date().toISOString(),value_mg_dl:216}])});await settle();
+ assert.equal(get('after-status').textContent,newestStatus);assert.ok(get('after-caption').textContent.includes('6 hours'));
  get('undo').onclick();await settle();assert.ok(calls.some(x=>x.opt.method==='DELETE'));assert.equal(get('toast-label').textContent,'Removed ✓');
  tabs[2].onclick();assert.equal(get('panel-food').hidden,false);assert.equal(get('panel-rhythm').hidden,true);
  get('home-focus').onclick();assert.equal(get('panel-focus').hidden,false);get('focus-kind').value='high';get('focus-window').value='720';get('focus-habit').value='Notice afternoons';get('focus-plan').onsubmit({preventDefault(){}});await settle();assert.equal(get('focus-thread').hidden,false);assert.ok(storage.has('orbit-focus-phone-v1:test-owner'));checks[0].onclick();await settle();assert.ok(get('focus-checkin-status').textContent.includes('Tried it'));get('focus-note').value='A busy day';get('save-focus-note').onclick();await settle();assert.equal(JSON.parse(storage.get('orbit-focus-phone-v1:test-owner')).habit,'Notice afternoons');get('finish-focus').onclick();await settle();assert.equal(get('focus-thread').hidden,true);tabs[2].onclick();

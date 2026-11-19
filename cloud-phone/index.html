@@ -4,9 +4,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c100f">
 <title>Sugar Orbits · Rhythm</title>
-<link rel="stylesheet" href="style.css?v=20261119-ai-focus">
+<link rel="stylesheet" href="style.css?v=20261119-after-moment">
 <script src="rhythm.js" defer></script><script src="orbit-draw.js" defer></script>
-<script src="app.js?v=20261119-one-tap-focus" defer></script>
+<script src="after-moment.js?v=20261119" defer></script>
+<script src="app.js?v=20261119-after-moment" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
   <section id="login">
@@ -35,6 +36,17 @@
       <div class="rhythm-legend"><span>Light · current week</span><span>Purple · preceding week</span><span>Guide circles · 3.9 / 10 mmol/L</span></div>
       <p id="rhythm-coverage" class="hint" role="status">Loading your recorded rhythm…</p>
       <p class="hint">Orange/blue arcs show how often recorded samples were above/below range at that time—not that the average was outside it. Missing sections are not filled in.</p>
+      <article class="after-moment card" aria-labelledby="after-title">
+        <p class="eyebrow">YOUR TAPS · A CLOSER LOOK</p><h2 id="after-title">After a moment.</h2>
+        <div id="after-filters" class="trace-controls" role="group" aria-label="Filter moments"></div>
+        <label>Choose a moment<select id="after-event"></select></label>
+        <div id="after-durations" class="trace-controls" role="group" aria-label="Hours after the moment"></div>
+        <p id="after-caption" class="hint"></p>
+        <canvas id="after-canvas" height="250" role="img" aria-label="Glucose readings after the selected moment"></canvas>
+        <p id="after-status" class="hint" role="status" aria-live="polite">Log a moment to explore what follows.</p>
+        <button id="after-refresh" class="quiet">Refresh this window</button>
+        <p class="hint">Actual readings, not an average. Purple marks 3.9–10 mmol/L. Gaps over 10 minutes break the line. Times use this phone’s time zone. After this moment—not necessarily because of it.</p>
+      </article>
       <button id="home-focus" class="focus-card"><span class="eyebrow">ONE SMALL FOCUS</span><strong id="home-focus-title">What would you like to notice?</strong><span id="home-focus-description">Choose one period or explore tagged activity.</span></button>
       <p class="association-note">Describe an association. Not a conclusion.</p>
       <details class="connection-details"><summary>Dexcom connection & refresh</summary>

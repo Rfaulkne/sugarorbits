@@ -13,6 +13,41 @@
   let rhythmRows=[],rhythmEvents=[],rhythmState=null,orbit=null;
   let chosenSuggestion=null;
   const R=window.OrbitRhythm;
+  const A=window.OrbitAfterMoment;
+  let afterKind='all',afterHours=3,afterId=null,afterSequence=0,afterData=null;
+  const momentName=e=>e.kind[0].toUpperCase()+e.kind.slice(1)+' · '+new Date(e.occurred_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  function clearAfter(){afterSequence++;afterData=null;A?.draw($('after-canvas'),null);$('after-canvas').setAttribute('aria-label','No trace displayed.');}
+  function afterEvents(){return rhythmEvents.filter(e=>['activity','stress','other'].includes(e.kind)&&Number.isFinite(Date.parse(e.occurred_at))&&Date.parse(e.occurred_at)<=Date.now()&&(afterKind==='all'||e.kind===afterKind));}
+  function renderAfter(){
+    const list=afterEvents();if(!list.some(e=>e.id===afterId))afterId=list[0]?.id||null;
+    $('after-event').replaceChildren();
+    for(const event of list){const option=document.createElement('option');option.value=event.id;option.textContent=momentName(event);$('after-event').append(option);}
+    $('after-event').value=afterId||'';$('after-event').disabled=!list.length;
+    $('after-filters').replaceChildren();
+    for(const kind of ['all','activity','stress','other']){const b=document.createElement('button');b.textContent=kind[0].toUpperCase()+kind.slice(1);b.setAttribute('aria-pressed',String(kind===afterKind));b.onclick=()=>{afterKind=kind;renderAfter();};$('after-filters').append(b);}
+    $('after-durations').replaceChildren();
+    for(const hours of [1,3,6]){const b=document.createElement('button');b.textContent=hours+'h';b.setAttribute('aria-pressed',String(hours===afterHours));b.onclick=()=>{afterHours=hours;renderAfter();};$('after-durations').append(b);}
+    void loadAfter();
+  }
+  async function loadAfter(){
+    clearAfter();const sequence=afterSequence,current=generation,event=afterEvents().find(e=>e.id===afterId);
+    $('after-caption').textContent=event?momentName(event)+' · following '+afterHours+' hours':'';
+    if(!session||!event){$('after-status').textContent=afterKind==='all'?'Log a moment to explore what follows.':'No saved '+afterKind+' moments in your most recent 20 taps.';return;}
+    $('after-status').textContent='Loading this moment’s readings…';
+    const start=Date.parse(event.occurred_at),hours=afterHours,now=Date.now(),end=Math.min(start+hours*3600000,now);
+    try{const token=await access();if(sequence!==afterSequence||current!==generation)return;
+      const rows=await request('/rest/v1/orbit_glucose?select=recorded_at,value_mg_dl&order=recorded_at.asc&limit=1000&recorded_at=gte.'+encodeURIComponent(new Date(start).toISOString())+'&recorded_at=lte.'+encodeURIComponent(new Date(end).toISOString()),{},token);
+      if(sequence!==afterSequence||current!==generation)return;
+      if(!Array.isArray(rows)||rows.length>=1000)throw new Error('Incomplete window');
+      afterData=A?.trace(rows,start,hours,now);A?.draw($('after-canvas'),afterData);
+      const points=afterData?.points||[];
+      $('after-status').textContent=(points.length?points.length+' recorded readings. '+(points.length===1?'A single reading cannot show a path. ':''):'No recorded readings in this window yet. ')+(afterData?.pending?'The remaining window is still ahead; refresh later.':'This window has elapsed; blank areas mean missing recordings, not in-range readings.');
+      $('after-canvas').setAttribute('aria-label',points.length?`Glucose after ${momentName(event)}. ${points.length} readings, ${points[0].v.toFixed(1)} to ${points.at(-1).v.toFixed(1)} mmol/L from first to last recorded sample. Gaps are not filled.`:'No recorded glucose readings after this moment.');
+    }catch{if(sequence===afterSequence&&current===generation)$('after-status').textContent='Could not load this window. Tap Refresh this window to retry.';}
+  }
+  $('after-event').onchange=()=>{afterId=$('after-event').value;renderAfter();};
+  $('after-refresh').onclick=()=>{void loadAfter();};
+  window.addEventListener('resize',()=>{if(session)A?.draw($('after-canvas'),afterData);});
   const say = text => { $('status').textContent = text; };
   async function request(path, options = {}, token) {
     const response = await fetch(URL + path, {...options, cache:'no-store',
@@ -43,7 +78,7 @@
     $('login').hidden = !!session; $('moments').hidden = !session;
     $('toast').hidden=true;undoId=null;clearPhoto();
     editingStaples=false;renderStaples();
-    rhythmRows=[];rhythmEvents=[];rhythmState=null;setTab('rhythm');setQuickLog(true);
+    rhythmRows=[];rhythmEvents=[];rhythmState=null;afterKind='all';afterId=null;clearAfter();renderAfter();setTab('rhythm');setQuickLog(true);
     for(const id of ['focus-habit','focus-note'])$(id).value='';
     for(const id of ['focus-title','focus-habit-copy','focus-progress','focus-comparison','focus-review-date','focus-checkin-status'])$(id).textContent='';
     $('rhythm-range').textContent='—';$('rhythm-coverage').textContent='Loading your recorded rhythm…';
@@ -134,7 +169,7 @@
     const id=crypto.randomUUID();
     const event={id,kind:button.dataset.kind,occurred_at:new Date().toISOString()};
     await request('/rest/v1/orbit_events', {method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(event)}, await access());
-    rhythmEvents.unshift(event);rhythmEvents=rhythmEvents.slice(0,20);paintRhythm();
+    rhythmEvents.unshift(event);rhythmEvents=rhythmEvents.slice(0,20);afterId=event.id;afterKind='all';paintRhythm();
     setQuickLog(false);say('');toast('Logged ✓',id);
   }));
   $('undo').onclick=()=>run(async()=>{const id=undoId;if(!id)return;await request('/rest/v1/orbit_events?id=eq.'+encodeURIComponent(id),{method:'DELETE'},await access());rhythmEvents=rhythmEvents.filter(e=>e.id!==id);paintRhythm();toast('Removed ✓');});
@@ -234,7 +269,7 @@
     if(window.OrbitCanvas){if(!orbit)orbit=new window.OrbitCanvas($('rhythm-canvas'),{mini:true});orbit.draw(rhythmState);}
     let observations=[];for(let start=0;start<1440;start+=180){const m=R.metrics(rhythmState.current,start,start+180);if(m.eligible>=3){for(const [key,name]of [['affectedHigh','above'],['affectedLow','below']])if(m[key]>=3)observations.push(`${clock(start)}–${clock(start+180)}: 3 consecutive five-minute samples ${name} range on ${m[key]} of ${m.eligible} covered days.`);}}
     $('focus-observation').textContent=observations.length?observations.slice(0,2).join(' ')+' Observations, not explanations.':'No recurring period meets the current minimum of three affected, adequately covered days. You can still choose something to observe.';
-    renderFocus();
+    renderFocus();renderAfter();
   }
   async function loadRhythm(){
     if(!R)return;const current=generation,token=await access(),focus=readFocus();
