@@ -8,13 +8,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="app-icon-180.png">
 <title>Sugar Orbits · Rhythm</title>
-<link rel="stylesheet" href="style.css?v=20261119-rhythm-lenses">
+<link rel="stylesheet" href="style.css?v=20261119-calm-rhythm">
 <script src="rhythm.js" defer></script><script src="orbit-draw.js" defer></script>
 <script src="after-moment.js?v=20261119" defer></script>
 <script src="focus-core.js?v=20261119" defer></script>
-<script src="rhythm-lenses.js?v=20261119" defer></script>
+<script src="rhythm-calm.js?v=20261119" defer></script>
 <script src="pwa.js?v=20261119" defer></script>
-<script src="app.js?v=20261119-rhythm-lenses" defer></script>
+<script src="app.js?v=20261119-calm-rhythm" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
   <details class="install-help"><summary>Keep Sugar Orbits on your phone</summary><p>Open this link in Safari, tap Share, then Add to Home Screen. Open the new icon to use app mode and enable reminders. Internet is required; health data is not cached for offline use.</p><p id="install-status" class="hint"></p></details>
@@ -39,11 +39,16 @@
     </div>
     </div>
     <section id="panel-rhythm">
-      <p class="eyebrow rhythm-eyebrow">YOUR RHYTHM · THREE LENSES</p><h1 class="rhythm-title" id="lens-title">One rhythm. Your perspective.</h1>
+      <p class="eyebrow rhythm-eyebrow">YOUR RHYTHM</p><h1 class="rhythm-title" id="lens-title">Your rhythm.</h1>
       <p id="rhythm-period" class="hint">Seven completed days · Europe/Berlin</p>
-      <div class="lens-switch" role="group" aria-label="Rhythm perspective"><button id="lens-week" aria-pressed="true">Week</button><button id="lens-patterns" aria-pressed="false">Patterns</button><button id="lens-focus" aria-pressed="false">My focus</button></div>
+      <div class="lens-switch" role="group" aria-label="Average period"><button id="calm-3" aria-pressed="false">3 days</button><button id="calm-7" aria-pressed="true">7 days</button></div>
+      <div hidden><button id="lens-week"></button><button id="lens-patterns"></button><button id="lens-focus"></button></div>
       <div class="rhythm-orbit"><canvas id="rhythm-canvas" width="800" height="800" aria-label="Seven daily glucose rings"></canvas><div class="rhythm-centre"><strong id="rhythm-range">—</strong><span id="lens-centre-label">in range</span><small id="lens-centre-note">recorded samples</small></div></div>
       <p id="lens-summary" class="hint lens-summary">Your recorded days will appear here.</p>
+      <button id="calm-reset" class="quiet" hidden>Back to daily average</button>
+      <div id="calm-items" class="calm-items"></div><p id="calm-empty" class="hint" hidden></p>
+      <article id="calm-selection" class="card" hidden><h2 id="calm-observation"></h2><p id="calm-numbers"></p><button id="calm-coach">Review with coach</button><details><summary>About this observation</summary><p id="calm-method" class="hint"></p></details></article>
+      <details class="calm-guides"><summary>Reading the orbit</summary><p class="hint">Neutral is the average glucose curve. Orange is above 10; blue is below 3.9 mmol/L. Purple circles mark the range. The average can hide individual highs and lows.</p></details>
       <div id="lens-day-controls"><label for="lens-day" id="lens-day-label">All seven days · oldest inside, newest outside</label><input id="lens-day" type="range" min="0" max="7" step="1" value="0" aria-label="Day dial: zero is all days, one is oldest, seven is newest"><button id="lens-all-days" class="quiet">All days</button></div>
       <div id="lens-options" class="pattern-options" hidden></div>
       <article id="lens-choice" class="card" hidden><p class="eyebrow">A POSSIBILITY, NOT A VERDICT</p><h2 id="lens-observation"></h2><p>Does anything about this time feel familiar?</p><p id="lens-context-tags" class="hint"></p><details><summary>What is behind this suggestion?</summary><p id="lens-evidence" class="hint"></p></details>
@@ -56,7 +61,7 @@
       <button id="lens-show-all" class="quiet">Show all pattern suggestions</button>
       <p id="rhythm-coverage" class="hint" role="status">Loading your recorded rhythm…</p>
       <p class="hint">Week: one ring per day, colour only where readings cross range. Patterns: grey daily rings with recurring-window markers. My focus: weekly mean with preceding-week comparison and 3.9 / 10 guides. Missing sections are never filled in.</p>
-      <article class="after-moment card" aria-labelledby="after-title">
+      <details class="tap-explorer"><summary>Explore individual taps</summary><article class="after-moment card" aria-labelledby="after-title">
         <p class="eyebrow">YOUR TAPS · A CLOSER LOOK</p><h2 id="after-title">After a moment.</h2>
         <div id="after-filters" class="trace-controls" role="group" aria-label="Filter moments"></div>
         <label>Choose a moment<select id="after-event"></select></label>
@@ -67,7 +72,7 @@
         <button id="after-refresh" class="quiet">Refresh this window</button>
         <p class="hint">Actual readings, not an average. Purple marks 3.9–10 mmol/L. Gaps over 10 minutes break the line. Times use this phone’s time zone. After this moment—not necessarily because of it.</p>
       </article>
-      <button id="home-focus" class="focus-card"><span class="eyebrow">ONE SMALL FOCUS</span><strong id="home-focus-title">What would you like to notice?</strong><span id="home-focus-description">Choose one period or explore tagged activity.</span></button>
+      </details><button id="home-focus" class="focus-card"><span class="eyebrow">MY FOCUS</span><strong id="home-focus-title">What would you like to notice?</strong><span id="home-focus-description">Choose one period or explore tagged activity.</span></button>
       <p class="association-note">Describe an association. Not a conclusion.</p>
       <details class="connection-details"><summary>Dexcom connection & refresh</summary>
       <div class="card" id="dexcom-card"><p class="eyebrow">DEXCOM CONNECTION TEST</p>
@@ -80,6 +85,7 @@
       </details>
     </section>
     <section id="panel-focus" hidden>
+      <p id="calm-coach-context" class="hint" hidden></p>
       <p id="cloud-focus-status" class="hint" role="status"></p><button id="refresh-focus" class="quiet">Refresh cloud focus</button><button id="move-local-focus" class="quiet" hidden>Start a new cloud week from my device-only plan</button>
       <p class="eyebrow">ONE SMALL FOCUS</p><h1 class="rhythm-title">Keep one thread.</h1><p>Notice what happens together. You choose what to explore.</p>
       <p id="focus-observation" class="hint">No pattern conclusions are generated without enough covered days.</p>

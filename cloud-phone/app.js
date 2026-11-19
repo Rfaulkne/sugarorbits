@@ -13,7 +13,7 @@
   let lenses=null;
   function drawLenses(){
     if(!window.OrbitLenses||!session)return;
-    if(!lenses)lenses=new window.OrbitLenses.Lenses({getFocus:readFocus,onCoach:()=>{setTab('focus');renderFocus();},onStart:(pattern,habit)=>run(async()=>{
+    if(!lenses)lenses=new window.OrbitLenses.Lenses({getFocus:readFocus,onCoach:observation=>{setTab('focus');renderFocus();$('calm-coach-context').hidden=!observation;if(observation)$('calm-coach-context').textContent=observation.type==='tag'?'From Rhythm: after '+observation.kind+' · '+observation.label+'. Calculated association, not an AI verdict. Stress-tag focus tracking is not connected yet.':'From Rhythm: '+clock(observation.start)+'–'+clock(observation.end)+' · recurring '+(observation.kind==='high'?'highs':'lows')+'.';},onStart:(pattern,habit)=>run(async()=>{
       chosenSuggestion=null;$('focus-kind').value=pattern.kind;$('focus-window').value=String(pattern.start);$('focus-habit').value=habit;await startFocus();lenses.setMode('focus');
     })});
     lenses.update(rhythmState,rhythmEvents);
@@ -118,6 +118,7 @@
     cloudReady=false;cloudKnown=false;cloudPlans=[];cloudConfig={};focusFacts=null;renderKept();$('focus-ai-answer').textContent='';$('focus-ai-ideas').replaceChildren();$('push-status').textContent='';$('cloud-focus-status').textContent='';$('move-local-focus').hidden=true;
     rhythmRows=[];rhythmEvents=[];rhythmState=null;afterKind='all';afterId=null;clearAfter();renderAfter();setTab(window.location?.hash==='#focus'?'focus':'rhythm');setQuickLog(true);
     lenses?.update(null);
+    $('calm-coach-context').hidden=true;$('calm-coach-context').textContent='';
     for(const id of ['focus-habit','focus-note'])$(id).value='';
     for(const id of ['focus-title','focus-habit-copy','focus-progress','focus-comparison','focus-review-date','focus-checkin-status'])$(id).textContent='';
     $('rhythm-range').textContent='—';$('rhythm-coverage').textContent='Loading your recorded rhythm…';

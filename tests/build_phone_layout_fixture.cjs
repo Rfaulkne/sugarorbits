@@ -1,7 +1,7 @@
 // Generates a temporary synthetic browser QA page, never part of deployment.
 const fs=require('node:fs'),path=require('node:path');
 const target=process.argv[2];if(!target||!target.endsWith('/dist/__qa/rhythm.html'))throw new Error('Use the temporary dist/__qa/rhythm.html path.');
-let html=fs.readFileSync('cloud-phone/index.html','utf8').replace(/(href|src)="(style\.css|rhythm\.js|rhythm-lenses\.js|orbit-draw\.js|after-moment\.js|focus-core\.js|pwa\.js|app\.js|manifest\.webmanifest|app-icon-180\.png)/g,'$1="/moments/$2').replace(/<script src="\/moments\/pwa\.js[^>]*><\/script>/,'');
+let html=fs.readFileSync('cloud-phone/index.html','utf8').replace(/(href|src)="(style\.css|rhythm\.js|rhythm-lenses\.js|rhythm-calm\.js|orbit-draw\.js|after-moment\.js|focus-core\.js|pwa\.js|app\.js|manifest\.webmanifest|app-icon-180\.png)/g,'$1="/moments/$2').replace(/<script src="\/moments\/pwa\.js[^>]*><\/script>/,'');
 const mock=`<script>
 // SYNTHETIC LAYOUT FIXTURE. Never calls a real API.
 const fixtureRows=[];for(let i=0;i<14*288;i++){const t=Date.now()-i*300000;const h=new Date(t).getUTCHours();fixtureRows.push({recorded_at:new Date(t).toISOString(),value_mg_dl:h>=11&&h<14?216:Math.round(125+40*Math.sin(h/24*Math.PI*2)+14*Math.sin(i/14))});}fixtureRows.sort((a,b)=>a.recorded_at.localeCompare(b.recorded_at));

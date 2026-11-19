@@ -22,7 +22,7 @@
       if(mode==='days'){this.days(state);return;}
       const minute=state.clockMinute;
       // Clock context, not a real-time reading or alert.
-      this.sector(minute-60,minute+60,'rgba(181,162,213,.065)',340);
+      if(!state.hideClock)this.sector(minute-60,minute+60,'rgba(181,162,213,.065)',340);
       if(mode==='focus'&&state.focus)this.sector(state.focus.start,state.focus.end,'rgba(206,221,156,.045)',345);
       this.circle(200,'rgba(181,162,213,.30)',.85);this.circle(radius(10),'rgba(181,162,213,.30)',.85);
       if(!this.mini){this.label('3.9',445,584,'#8f809f',11);this.label('10.0',468,675,'#8f809f',11);}
