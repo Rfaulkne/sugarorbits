@@ -18,7 +18,9 @@ function candidatesFor(rows,events,now=Date.now()){
     if(current.eligible<3)continue;
     for(const kind of ['high','low']){const affected=kind==='high'?current.affectedHigh:current.affectedLow;
       if(affected<3||affected/current.eligible<.5)continue;
-      out.push({id:kind+'-'+start,kind,start,end:start+180,unit:'covered days',current:compact(current),previous:compact(previous),preliminary:current.eligible<5});
+      const tag_context={activity:0,stress:0,other:0};
+      for(const event of events){const t=Date.parse(event.occurred_at);if(!Number.isFinite(t)||t>now||!(event.kind in tag_context))continue;const p=R.local(t);if(p.date>=R.shift(state.today,-7)&&p.date<state.today&&p.minute>=start&&p.minute<start+180)tag_context[event.kind]++;}
+      out.push({id:kind+'-'+start,kind,start,end:start+180,unit:'covered days',current:compact(current),previous:compact(previous),tag_context,preliminary:current.eligible<5});
     }
   }
   const tags=events.filter(e=>e.kind==='activity');

@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sugar Orbits · local push key generator</title><link rel="stylesheet" href="style.css"><main><h1>Reminder keys.</h1><p>One-time owner setup. Keys are generated on this device using Web Crypto. This page does not upload or save them. Do not share the private key in chat, screenshots or GitHub.</p><p>Copy the values only into your Supabase Edge Functions secrets. Generating a new pair after registering phones requires re-registering those phones.</p><button id="generate">Generate a VAPID key pair locally</button><label>ORBIT_VAPID_PUBLIC_KEY<textarea id="public" readonly rows="3"></textarea></label><label>ORBIT_VAPID_PRIVATE_KEY — secret<textarea id="private" readonly rows="3"></textarea></label><p id="result" role="status"></p><p>Also add ORBIT_VAPID_SUBJECT with a contact address in this format: mailto:you@example.com</p><p>Close this page when finished. It does not save the values.</p></main><script>
+document.getElementById('generate').onclick=async()=>{
+ const result=document.getElementById('result');
+ try{const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']),jwk=await crypto.subtle.exportKey('jwk',pair.privateKey),raw=new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey));
+  const encode=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  document.getElementById('public').value=encode(raw);document.getElementById('private').value=jwk.d;result.textContent='Generated locally. Copy to Supabase Secrets now; nothing was uploaded.';
+ }catch{result.textContent='Key generation failed. Open this page over HTTPS in a current browser.';}
+};
+</script></html>

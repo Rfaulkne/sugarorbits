@@ -3,19 +3,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c100f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sugar Orbits">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="app-icon-180.png">
 <title>Sugar Orbits · Rhythm</title>
-<link rel="stylesheet" href="style.css?v=20261119-after-moment">
+<link rel="stylesheet" href="style.css?v=20261119-focus-loop">
 <script src="rhythm.js" defer></script><script src="orbit-draw.js" defer></script>
 <script src="after-moment.js?v=20261119" defer></script>
-<script src="app.js?v=20261119-after-moment" defer></script>
+<script src="focus-core.js?v=20261119" defer></script>
+<script src="pwa.js?v=20261119" defer></script>
+<script src="app.js?v=20261119-focus-loop" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
+  <details class="install-help"><summary>Keep Sugar Orbits on your phone</summary><p>Open this link in Safari, tap Share, then Add to Home Screen. Open the new icon to use app mode and enable reminders. Internet is required; health data is not cached for offline use.</p><p id="install-status" class="hint"></p></details>
   <section id="login">
     <p class="eyebrow">A LITTLE CONTEXT</p><h1>Notice. Tap.<br>Carry on.</h1>
     <p>Your private moments, connected.</p>
     <form id="login-form">
       <label>Email<input id="email" type="email" autocomplete="username" required></label>
       <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+      <label class="consent"><input id="remember-device" type="checkbox">Keep me signed in on this personal device.</label><p class="hint">Optional: stores session tokens in this browser, not your password. Anyone who can open this unlocked app may access your data. Sign out to remove them.</p>
       <button type="submit">Sign in</button>
     </form>
     <p class="hint">Use your Sugar Orbits account—not your Dexcom password. Account creation is invitation-only during testing.</p>
@@ -60,10 +68,11 @@
       </details>
     </section>
     <section id="panel-focus" hidden>
+      <p id="cloud-focus-status" class="hint" role="status"></p><button id="refresh-focus" class="quiet">Refresh cloud focus</button><button id="move-local-focus" class="quiet" hidden>Start a new cloud week from my device-only plan</button>
       <p class="eyebrow">ONE SMALL FOCUS</p><h1 class="rhythm-title">Keep one thread.</h1><p>Notice what happens together. You choose what to explore.</p>
       <p id="focus-observation" class="hint">No pattern conclusions are generated without enough covered days.</p>
       <article class="card" id="coach-card"><p class="eyebrow">AI-ASSISTED CHOICES · YOU DECIDE</p><p>Calculations notice recurring periods. AI helps present a few possibilities—not their causes.</p>
-        <p id="coach-active-note" class="hint" hidden>Your focus is underway. Finish and clear it before asking for new choices. The check-ins below are guided, not an AI conversation yet.</p>
+        <p id="coach-active-note" class="hint" hidden>Your focus is underway. Check in below, ask the coach for an observation idea, or review progress. Finish or save a reflection before choosing another focus.</p>
         <div id="coach-new-options"><button id="coach-find">Find a focus with AI</button><p class="hint">Using this button sends calculated pattern summaries and activity-window counts to OpenAI. No raw glucose traces, event timestamps, notes or credentials. Nothing is sent just by signing in. Provider retention policies may apply. Focus and Food Genie share the daily limit of 20 AI requests.</p></div>
         <p id="coach-status" role="status" aria-live="polite"></p><div id="coach-suggestions"></div>
       </article>
@@ -73,13 +82,27 @@
         <label>What are you curious about?<select id="focus-kind"><option value="high">Periods above range</option><option value="low">Periods below range</option><option value="activity">Around tagged activity</option></select></label>
         <label id="focus-window-label">Time of day<select id="focus-window"><option value="0">00:00–03:00</option><option value="180">03:00–06:00</option><option value="360">06:00–09:00</option><option value="540">09:00–12:00</option><option value="720">12:00–15:00</option><option value="900">15:00–18:00</option><option value="1080">18:00–21:00</option><option value="1260">21:00–24:00</option></select></label>
         <label>What will you try or simply observe?<input id="focus-habit" maxlength="160" required placeholder="e.g. Tag my gym visits and notice the pattern"></label>
-        <p class="hint">One focus, seven days. This plan and its check-ins stay on this device for up to 28 days. They do not sync to the Pi or cloud yet.</p><button type="submit">Start my seven days</button>
+        <div id="habit-ideas" class="trace-controls" role="group" aria-label="Low effort observation ideas"><button type="button" data-experiment="tag">Tag context</button><button type="button" data-experiment="routine">Notice routines</button><button type="button" data-experiment="team">Ask my team</button></div>
+        <p class="hint">One focus, seven days. Cloud plans and check-ins sync once the new backend is configured, and expire after 28 days. Until then, existing device-only mode is explicitly labelled.</p><button type="submit">Start my seven days</button>
       </form>
       <div id="focus-thread" hidden><article class="card"><p class="eyebrow" id="focus-stage"></p><h2 id="focus-title"></h2><p id="focus-habit-copy"></p><p id="focus-review-date" class="hint"></p>
-        <p class="eyebrow">GUIDED CHECK-IN · NOT AI</p><p id="focus-prompt">How did your chosen experiment fit today?</p><div class="checkin-actions"><button data-checkin="tried">Tried it</button><button data-checkin="not-today" class="secondary">Not today</button><button data-checkin="skip" class="quiet">Skip</button></div><p id="focus-checkin-status" class="hint" role="status"></p>
+        <p class="eyebrow">A SMALL CHECK-IN</p><p id="focus-prompt">How did your chosen experiment fit today?</p><div class="checkin-actions"><button data-checkin="tried">Tried it</button><button data-checkin="not-today" class="secondary">Not today</button><button data-checkin="skip" class="quiet">Skip</button></div><p id="focus-checkin-status" class="hint" role="status"></p>
         <details><summary>Add a thought</summary><label>Optional reflection<input id="focus-note" maxlength="240" placeholder="Anything you noticed, without needing a perfect record"></label><button id="save-focus-note" class="quiet">Save thought</button></details>
-      </article><article class="card"><h2>What is being observed?</h2><p id="focus-progress"></p><p id="focus-comparison" class="hint"></p><p class="hint">Associations only. Tags do not establish causes; fewer highs are not presented as a win without also showing lows and coverage.</p></article><button id="finish-focus" class="quiet">Finish & clear this focus</button></div>
-      <p class="hint">AI currently assists with choosing a focus only. Follow-up conversation, notifications and cloud-synced plans are not connected yet. Check-ins remain guided—not AI responses or treatment advice.</p>
+      </article><article class="card"><h2>What is being observed?</h2><p id="focus-progress"></p><p id="focus-comparison" class="hint"></p><p id="focus-tags" class="hint"></p><button id="focus-review" class="quiet">Update progress</button><p class="hint">Associations only. Tags do not establish causes; fewer highs are not presented as a win without also showing lows and coverage.</p></article>
+      <article class="card"><h2>A little help choosing your next step.</h2><button id="focus-ask">Ask coach</button><p class="hint">This button sends calculated before/during summaries, tag counts and check-in counts to OpenAI. Your written experiment, reflections, notes and raw readings are not sent. AI selects from a small, checked library of reflection questions and observation ideas—not treatment instructions.</p><p id="focus-ai-answer" role="status"></p><div id="focus-ai-ideas"></div></article>
+      <article id="focus-reflection" class="card" hidden><h2 id="focus-outcome-title">What would you like to keep?</h2><p class="hint">Even a clearer improvement is not proof of a cause or a permanent resolution. What do you think worked well?</p><label>One thing worth remembering<input id="focus-worked" maxlength="240" placeholder="Something that felt practical for me"></label><button id="keep-focus">Save what helped</button></article>
+      <button id="finish-focus" class="quiet">Finish this focus</button></div>
+      <article class="card"><h2>Reminders that fit the moment.</h2><p class="hint">Focus reminders follow the chosen window in Europe/Berlin, including daylight-saving changes. Activity focuses use the clock time below. Nothing is enabled automatically.</p>
+        <button id="push-enable">Enable notifications on this phone</button><button id="push-disable" class="quiet">Disable notifications on this phone</button><p id="push-status" class="hint" role="status"></p>
+        <div id="active-reminder-controls" hidden>
+        <label class="consent"><input id="reminder-enabled" type="checkbox">Remind me for the active focus</label>
+        <label>When?<select id="reminder-lead"><option value="15">15 minutes before</option><option value="0">At the start</option><option value="30">30 minutes before</option></select></label>
+        <label>For an activity focus<input id="reminder-time" type="time" value="18:00"></label>
+        <div class="reminder-times"><label>Quiet from<input id="quiet-start" type="time" value="22:00"></label><label>Until<input id="quiet-end" type="time" value="08:00"></label></div>
+        <button id="save-reminder" class="quiet">Save active focus reminder</button><p class="hint">Quiet hours skip a reminder rather than moving it to an unrelated time. Equal quiet times turn quiet hours off. Delivery is best-effort, never a glucose alarm.</p>
+        </div>
+      </article>
+      <section id="kept-focuses"><h2>Keep what helped.</h2><p class="hint">Reflections you choose to keep appear here. Optional weekly reminders can maintain the habit even while you explore another focus. Each plan expires 28 days after it began.</p><div id="kept-list"></div></section>
     </section>
     <section id="panel-food" hidden>
       <h2>A second look at your plate.</h2><p>Scan it. Say it. Or tap a staple.</p>
@@ -103,7 +126,7 @@
       <p class="hint">Test limit: 20 AI requests per day; wait 10 seconds between requests. Usually two requests per meal.</p>
     </section>
     <button id="logout" class="quiet">Sign out</button>
-    <p class="hint">Up to 20 event tags are kept for up to 28 days. Pi sync and notifications are not connected yet.</p>
+    <p class="hint">Up to 20 event tags and up to five focus plans are kept for up to 28 days. Cloud reminders need the new server setup. The Pi interface is unchanged.</p>
   </section>
   <p id="status" role="status" aria-live="polite"></p>
   <div id="toast" role="status" aria-live="polite" hidden><span id="toast-label"></span><button id="undo" class="quiet">Undo</button></div>
