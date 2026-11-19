@@ -3,13 +3,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c100f">
-<title>Sugar Orbits · Moments</title>
-<link rel="stylesheet" href="style.css?v=20261119-fit">
-<script src="app.js" defer></script>
+<title>Sugar Orbits · Rhythm</title>
+<link rel="stylesheet" href="style.css?v=20261119-rhythm">
+<script src="rhythm.js" defer></script><script src="orbit-draw.js" defer></script>
+<script src="app.js?v=20261119-rhythm" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
-  <p class="eyebrow">A LITTLE CONTEXT</p><h1>Notice. Tap.<br>Carry on.</h1>
   <section id="login">
+    <p class="eyebrow">A LITTLE CONTEXT</p><h1>Notice. Tap.<br>Carry on.</h1>
     <p>Your private moments, connected.</p>
     <form id="login-form">
       <label>Email<input id="email" type="email" autocomplete="username" required></label>
@@ -19,27 +20,47 @@
     <p class="hint">Use your Sugar Orbits account—not your Dexcom password. Account creation is invitation-only during testing.</p>
   </section>
   <section id="moments" hidden>
-    <nav aria-label="Companion sections"><button data-tab="log" aria-pressed="true">Log</button><button data-tab="coach" aria-pressed="false">Coach</button><button data-tab="food" aria-pressed="false">Food Genie</button></nav>
-    <section id="panel-log">
-    <p>One tap saves the moment. Nothing else needed.</p>
-    <div class="tags">
+    <nav aria-label="Companion sections"><button data-tab="rhythm" aria-pressed="true">Rhythm</button><button data-tab="focus" aria-pressed="false">Focus</button><button data-tab="food" aria-pressed="false">Food Genie</button></nav>
+    <div class="quick-head"><span>A moment of context</span><button id="quick-log-toggle" class="quiet" aria-expanded="true" aria-controls="quick-log">Hide quick log</button></div>
+    <div id="quick-log"><div class="tags">
       <button data-kind="activity"><span>↗</span>Activity</button>
       <button data-kind="stress"><span>≈</span>Stress</button>
       <button data-kind="other"><span>＋</span>Other</button>
     </div>
-    <p class="hint">Saved privately with a timestamp. No growing list, no perfect record needed.</p>
-    </section>
-    <section id="panel-coach" hidden>
-      <h2>One small focus.</h2><p>We’ll look for recurring periods together, then you choose one habit to explore for seven days.</p>
+    </div>
+    <section id="panel-rhythm">
+      <p class="eyebrow rhythm-eyebrow">YOUR RHYTHM</p><h1 class="rhythm-title">Notice the shape.</h1>
+      <p id="rhythm-period" class="hint">Seven completed days · Europe/Berlin</p>
+      <div class="rhythm-orbit"><canvas id="rhythm-canvas" width="800" height="800" aria-label="Seven-day glucose profile and preceding week"></canvas><div class="rhythm-centre"><strong id="rhythm-range">—</strong><span>in range</span><small>recorded samples</small></div></div>
+      <div class="rhythm-legend"><span>Light · current week</span><span>Purple · preceding week</span><span>Guide circles · 3.9 / 10 mmol/L</span></div>
+      <p id="rhythm-coverage" class="hint" role="status">Loading your recorded rhythm…</p>
+      <p class="hint">Orange/blue arcs show how often recorded samples were above/below range at that time—not that the average was outside it. Missing sections are not filled in.</p>
+      <button id="home-focus" class="focus-card"><span class="eyebrow">ONE SMALL FOCUS</span><strong id="home-focus-title">What would you like to notice?</strong><span id="home-focus-description">Choose one period or explore tagged activity.</span></button>
+      <p class="association-note">Describe an association. Not a conclusion.</p>
+      <details class="connection-details"><summary>Dexcom connection & refresh</summary>
       <div class="card" id="dexcom-card"><p class="eyebrow">DEXCOM CONNECTION TEST</p>
         <p id="dexcom-status" role="status">Sign in to check stored readings.</p>
         <strong id="dexcom-value">—</strong><span id="dexcom-unit" hidden> mmol/L · latest stored reading</span>
         <p id="dexcom-time"></p><p id="dexcom-sync-time" class="hint"></p>
         <button id="dexcom-sync">Fetch Dexcom data</button><button id="dexcom-refresh" class="quiet">Refresh status</button>
-        <p class="hint">Connection test only. This requests up to the latest 24 hours from Share and stores them privately in your cloud account. No readings are sent to AI. Automatic collection and Pi pairing are not enabled yet.</p>
+        <p class="hint">Fetch requests up to 24 hours from Share. Refresh only reads the cloud copy. No readings are sent to AI. Collection continues with the app closed only if your scheduled collector is working; Pi pairing is separate.</p>
       </div>
-      <div class="card"><p class="eyebrow">COACH NOT CONNECTED YET</p><p>First, compare the fetched value and its time with Dexcom. Then we can enable collection and build a reliable seven-day baseline. No patterns or coaching conclusions are being generated here yet.</p></div>
-      <p class="hint">Logging works now. Data-connected coaching and check-ins are the next stage, not active in this build.</p>
+      </details>
+    </section>
+    <section id="panel-focus" hidden>
+      <p class="eyebrow">ONE SMALL FOCUS</p><h1 class="rhythm-title">Keep one thread.</h1><p>Notice what happens together. You choose what to explore.</p>
+      <p id="focus-observation" class="hint">No pattern conclusions are generated without enough covered days.</p>
+      <form id="focus-plan" class="card">
+        <label>What are you curious about?<select id="focus-kind"><option value="high">Periods above range</option><option value="low">Periods below range</option><option value="activity">Around tagged activity</option></select></label>
+        <label id="focus-window-label">Time of day<select id="focus-window"><option value="0">00:00–03:00</option><option value="180">03:00–06:00</option><option value="360">06:00–09:00</option><option value="540">09:00–12:00</option><option value="720">12:00–15:00</option><option value="900">15:00–18:00</option><option value="1080">18:00–21:00</option><option value="1260">21:00–24:00</option></select></label>
+        <label>What will you try or simply observe?<input id="focus-habit" maxlength="160" required placeholder="e.g. Tag my gym visits and notice the pattern"></label>
+        <p class="hint">One focus, seven days. This plan and its check-ins stay on this device for up to 28 days. They do not sync to the Pi or cloud yet.</p><button type="submit">Start my seven days</button>
+      </form>
+      <div id="focus-thread" hidden><article class="card"><p class="eyebrow" id="focus-stage"></p><h2 id="focus-title"></h2><p id="focus-habit-copy"></p><p id="focus-review-date" class="hint"></p>
+        <p class="eyebrow">GUIDED CHECK-IN · NOT AI</p><p id="focus-prompt">How did your chosen experiment fit today?</p><div class="checkin-actions"><button data-checkin="tried">Tried it</button><button data-checkin="not-today" class="secondary">Not today</button><button data-checkin="skip" class="quiet">Skip</button></div><p id="focus-checkin-status" class="hint" role="status"></p>
+        <details><summary>Add a thought</summary><label>Optional reflection<input id="focus-note" maxlength="240" placeholder="Anything you noticed, without needing a perfect record"></label><button id="save-focus-note" class="quiet">Save thought</button></details>
+      </article><article class="card"><h2>What is being observed?</h2><p id="focus-progress"></p><p id="focus-comparison" class="hint"></p><p class="hint">Associations only. Tags do not establish causes; fewer highs are not presented as a win without also showing lows and coverage.</p></article><button id="finish-focus" class="quiet">Finish & clear this focus</button></div>
+      <p class="hint">AI conversation, notifications and cloud-synced plans are not connected in this version. The current prompts are guided check-ins—not AI responses or treatment advice.</p>
     </section>
     <section id="panel-food" hidden>
       <h2>A second look at your plate.</h2><p>Scan it. Say it. Or tap a staple.</p>

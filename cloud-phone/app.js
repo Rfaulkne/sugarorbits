@@ -10,6 +10,8 @@
   let session = null, refreshing = null, busy = false, generation = 0;
   let image = null, photoGeneration = 0, undoId = null, toastTimer, fadeTimer;
   let cameraStream=null,cameraGeneration=0,editingStaples=false;
+  let rhythmRows=[],rhythmEvents=[],rhythmState=null,orbit=null;
+  const R=window.OrbitRhythm;
   const say = text => { $('status').textContent = text; };
   async function request(path, options = {}, token) {
     const response = await fetch(URL + path, {...options, cache:'no-store',
@@ -40,6 +42,11 @@
     $('login').hidden = !!session; $('moments').hidden = !session;
     $('toast').hidden=true;undoId=null;clearPhoto();
     editingStaples=false;renderStaples();
+    rhythmRows=[];rhythmEvents=[];rhythmState=null;setTab('rhythm');setQuickLog(true);
+    for(const id of ['focus-habit','focus-note'])$(id).value='';
+    for(const id of ['focus-title','focus-habit-copy','focus-progress','focus-comparison','focus-review-date','focus-checkin-status'])$(id).textContent='';
+    $('rhythm-range').textContent='—';$('rhythm-coverage').textContent='Loading your recorded rhythm…';
+    if(orbit)orbit.draw(null);renderFocus();
     $('dexcom-value').textContent='—';$('dexcom-unit').hidden=true;$('dexcom-time').textContent='';$('dexcom-sync-time').textContent='';$('dexcom-status').textContent='No readings checked yet.';
   }
   function toast(text,id=null) {
@@ -119,17 +126,88 @@
     session=await request('/auth/v1/token?grant_type=password', {method:'POST',body:JSON.stringify({email:$('email').value.trim(),password})});
     generation++;showSession();say('Connected.');
     try{await refreshDexcom();}catch{$('dexcom-status').textContent='Could not load glucose status. Open Coach and try Refresh status.';}
+    try{await loadRhythm();}catch{$('rhythm-coverage').textContent='Could not load the complete rhythm window. Use Refresh status below to retry. No pattern conclusions are shown.';}
   });};
   document.querySelectorAll('[data-kind]').forEach(button=>button.onclick=()=>run(async()=>{
     const id=crypto.randomUUID();
-    await request('/rest/v1/orbit_events', {method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({id,kind:button.dataset.kind,occurred_at:new Date().toISOString()})}, await access());
-    say('');toast('Logged ✓',id);
+    const event={id,kind:button.dataset.kind,occurred_at:new Date().toISOString()};
+    await request('/rest/v1/orbit_events', {method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(event)}, await access());
+    rhythmEvents.unshift(event);rhythmEvents=rhythmEvents.slice(0,20);paintRhythm();
+    setQuickLog(false);say('');toast('Logged ✓',id);
   }));
-  $('undo').onclick=()=>run(async()=>{const id=undoId;if(!id)return;await request('/rest/v1/orbit_events?id=eq.'+encodeURIComponent(id),{method:'DELETE'},await access());toast('Removed ✓');});
+  $('undo').onclick=()=>run(async()=>{const id=undoId;if(!id)return;await request('/rest/v1/orbit_events?id=eq.'+encodeURIComponent(id),{method:'DELETE'},await access());rhythmEvents=rhythmEvents.filter(e=>e.id!==id);paintRhythm();toast('Removed ✓');});
+  function setQuickLog(show){$('quick-log').hidden=!show;$('quick-log-toggle').textContent=show?'Hide quick log':'Log moment';$('quick-log-toggle').setAttribute('aria-expanded',String(show));}
+  $('quick-log-toggle').onclick=()=>{if(!busy)setQuickLog($('quick-log').hidden);};
+  function setTab(tab){for(const name of ['rhythm','focus','food'])$('panel-'+name).hidden=name!==tab;document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));}
   document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{
-    for(const tab of ['log','coach','food'])$('panel-'+tab).hidden=tab!==button.dataset.tab;
-    document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));say('');
+    setTab(button.dataset.tab);say('');
   });
+  $('home-focus').onclick=()=>{if(!busy){setTab('focus');renderFocus();}};
+  const pct=n=>typeof n==='number'&&Number.isFinite(n)?Math.round(n*100)+'%':'—';
+  const clock=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+  function focusKey(){return session?.user?.id?'orbit-focus-phone-v1:'+session.user.id:null;}
+  function readFocus(){try{const f=JSON.parse(localStorage.getItem(focusKey())||'null');if(!f)return null;
+    if(!['high','low','activity'].includes(f.kind)||!Number.isFinite(f.started)||f.started>Date.now()||Date.now()-f.started>28*864e5||typeof f.habit!=='string'||f.habit.length>160||!Number.isInteger(f.start)||f.start<0||f.start>1260){if(focusKey())localStorage.removeItem(focusKey());return null;}return f;
+  }catch{return null;}}
+  function saveFocus(f){const key=focusKey();if(!key)throw new Error('Sign in again before saving a focus.');localStorage.setItem(key,JSON.stringify(f));renderFocus();}
+  function focusMetrics(f,baseline=false){if(!rhythmState||!R)return null;
+    if(f.kind==='activity')return R.activityMetrics(rhythmState.all,rhythmEvents,baseline?f.started-7*864e5:f.started,baseline?f.started:Math.min(Date.now(),f.started+7*864e5));
+    return R.metrics(baseline?rhythmState.current:rhythmState.all,f.start,f.start+180,baseline?-Infinity:f.started,baseline?f.started:Math.min(Date.now(),f.started+7*864e5));
+  }
+  function renderFocus(){
+    const f=readFocus();$('focus-plan').hidden=!!f;$('focus-thread').hidden=!f;
+    $('focus-window-label').hidden=$('focus-kind').value==='activity';
+    if(!f){$('home-focus-title').textContent='What would you like to notice?';$('home-focus-description').textContent='Choose one period or explore tagged activity.';return;}
+    const elapsed=Math.floor((Date.now()-f.started)/864e5),review=elapsed>=7;
+    const title=f.kind==='activity'?'Around tagged activity':`${f.kind==='high'?'Above':'Below'} range · ${clock(f.start)}–${clock(f.start+180)}`;
+    $('home-focus-title').textContent=title;$('home-focus-description').textContent=review?'Your seven-day reflection is ready to revisit.':`Day ${Math.min(7,elapsed+1)} of 7 · ${f.habit}`;
+    $('focus-stage').textContent=review?'SEVEN-DAY REFLECTION':`DAY ${elapsed+1} OF 7`;$('focus-title').textContent=title;$('focus-habit-copy').textContent=f.habit;
+    $('focus-review-date').textContent='Review from '+new Date(f.started+7*864e5).toLocaleDateString()+'. Plan and check-ins are saved on this phone only.';
+    const today=R?R.local(Date.now()).date:new Date().toISOString().slice(0,10),entry=f.checkins?.[today];
+    const names={tried:'Tried it','not-today':'Not today',skip:'Skipped',note:'Thought saved'};
+    $('focus-checkin-status').textContent=entry?(names[entry.status]||'Checked in')+' today. You can change it.':'No check-in needed to keep exploring.';$('focus-note').value=typeof entry?.note==='string'?entry.note:'';
+    $('focus-prompt').textContent=review?'What did you notice? Continue, adjust or finish—there is no automatic “resolved” verdict.':'How did your chosen experiment fit today?';
+    const current=focusMetrics(f),base=f.baseline;
+    const describe=m=>m&&m.eligible?`${m.eligible} covered ${f.kind==='activity'?'activity windows':'days'} · ${pct(m.range)} in range · ${pct(m.high)} above · ${pct(m.low)} below`:'Not enough covered windows to describe yet.';
+    $('focus-progress').textContent='Recorded samples — Before: '+describe(base)+' During: '+describe(current);
+    const enough=base?.eligible>=5&&current?.eligible>=5;
+    $('focus-comparison').textContent=(enough?'Both periods have at least five covered windows. These are descriptive observations, not evidence that your experiment caused a change.':'Comparison is provisional: at least five covered windows in each period are needed before interpreting a change.')+(f.kind==='activity'?' Activity means the two hours after a tag; overlapping tags are combined. Untagged activity is unknown.':' Only complete three-hour windows with at least 70% sample coverage are counted.');
+  }
+  $('focus-kind').onchange=()=>{$('focus-window-label').hidden=$('focus-kind').value==='activity';};
+  $('focus-plan').onsubmit=event=>{event.preventDefault();run(async()=>{
+    if(readFocus())throw new Error('Finish the current focus before starting another.');
+    const habit=$('focus-habit').value.trim();if(!habit)throw new Error('Describe one thing you will try or observe.');
+    const f={started:Date.now(),kind:$('focus-kind').value,start:Number($('focus-window').value),habit,checkins:{}};
+    f.baseline=focusMetrics(f,true);saveFocus(f);toast('Focus saved on this phone ✓');
+  });};
+  function checkIn(status){const f=readFocus();if(!f)return;const date=R?R.local(Date.now()).date:new Date().toISOString().slice(0,10);f.checkins=f.checkins||{};f.checkins[date]={status:status||f.checkins[date]?.status||'note',note:$('focus-note').value.slice(0,240)};saveFocus(f);toast('Check-in saved ✓');}
+  document.querySelectorAll('[data-checkin]').forEach(b=>b.onclick=()=>run(async()=>checkIn(b.dataset.checkin)));
+  $('save-focus-note').onclick=()=>run(async()=>checkIn(null));
+  $('finish-focus').onclick=()=>run(async()=>{const key=focusKey();if(key)localStorage.removeItem(key);renderFocus();toast('Focus cleared from this phone');});
+  function paintRhythm(){
+    if(!R||!session)return;rhythmState=R.summarize(rhythmRows,rhythmEvents);
+    $('rhythm-range').textContent=pct(rhythmState.rangeFraction);
+    $('rhythm-period').textContent=R.shift(rhythmState.today,-7)+' to '+R.shift(rhythmState.today,-1)+' · Europe/Berlin';
+    const bins=rhythmState.profile.filter(p=>p.mean!==null).length;
+    $('rhythm-coverage').textContent=`${rhythmState.coveredDates} of 7 completed days have recorded samples; ${bins} of 48 clock sections can be drawn. `+(rhythmState.coveredDates<5?'Building a picture—do not interpret this as an established pattern.':'Averages describe available recordings; gaps and incomplete days can affect the shape.');
+    if(window.OrbitCanvas){if(!orbit)orbit=new window.OrbitCanvas($('rhythm-canvas'),{mini:true});orbit.draw(rhythmState);}
+    let observations=[];for(let start=0;start<1440;start+=180){const m=R.metrics(rhythmState.current,start,start+180);if(m.eligible>=3){for(const [key,name]of [['affectedHigh','above'],['affectedLow','below']])if(m[key]>=3)observations.push(`${clock(start)}–${clock(start+180)}: 3 consecutive five-minute samples ${name} range on ${m[key]} of ${m.eligible} covered days.`);}}
+    $('focus-observation').textContent=observations.length?observations.slice(0,2).join(' ')+' Observations, not explanations.':'No recurring period meets the current minimum of three affected, adequately covered days. You can still choose something to observe.';
+    renderFocus();
+  }
+  async function loadRhythm(){
+    if(!R)return;const current=generation,token=await access(),focus=readFocus();
+    const cutoff=new Date(Math.min(Date.now()-16*864e5,focus?.started||Date.now())).toISOString();let cursor=null,rows=[],complete=false;
+    for(let page=0;page<20;page++){
+      const result=await request('/rest/v1/orbit_glucose?select=recorded_at,value_mg_dl&order=recorded_at.asc&limit=1000&recorded_at=gte.'+encodeURIComponent(cutoff)+(cursor?'&recorded_at=gt.'+encodeURIComponent(cursor):''),{},token);
+      if(!Array.isArray(result))throw new Error('Could not load rhythm history.');if(!result.length){complete=true;break;}
+      const next=result[result.length-1].recorded_at;if(!Number.isFinite(Date.parse(next))||(cursor&&next<=cursor))throw new Error('History pagination did not advance.');rows.push(...result);cursor=next;
+    }
+    if(!complete)throw new Error('The full history window could not be loaded.');
+    const events=await request('/rest/v1/orbit_events?select=id,kind,occurred_at&order=occurred_at.desc&limit=20',{},token);if(!Array.isArray(events))throw new Error('Could not load context tags.');
+    if(current!==generation)return;rhythmRows=rows;rhythmEvents=events;paintRhythm();
+  }
+  window.addEventListener('resize',()=>{if(orbit&&rhythmState&&session)orbit.draw(rhythmState);});
   const friendlySyncErrors={share_auth_failed:'Dexcom login failed. Check your saved credentials, region and Share setup.',share_unavailable:'Dexcom Share was unavailable.',no_readings:'Share returned no recent readings.',invalid_readings:'An unexpected value or timestamp was rejected.',storage_error:'Cloud storage setup needs checking.',connection_failed:'The collector could not connect.',session_expired:'The Share session could not be renewed.'};
   async function refreshDexcom(){
     const current=generation,token=await access();
@@ -152,14 +230,14 @@
     $('dexcom-status').textContent=(stale?'Older reading—more than 15 minutes old at this check.':'Recent stored reading at this check—compare its time with Dexcom.')+(state?.error_code?' Last fetch failed; this is previously saved data.':'');
   }
   $('dexcom-refresh').onclick=()=>run(async()=>{
-    try{await refreshDexcom();say('Status refreshed. No new Dexcom fetch was requested.');}catch(error){$('dexcom-status').textContent='Could not refresh stored glucose status.';throw error;}
+    try{await refreshDexcom();await loadRhythm();say('Status and rhythm refreshed. No new Dexcom fetch was requested.');}catch(error){$('dexcom-status').textContent='Could not refresh the complete stored glucose view.';throw error;}
   });
   $('dexcom-sync').onclick=()=>run(async()=>{
     $('dexcom-status').textContent='Fetching recent readings from Dexcom Share…';say('');
     try{
       const result=await request('/functions/v1/dexcom-sync',{method:'POST',body:'{}'},await access());
       if(result.ok!==true)throw new Error('The collector did not confirm a successful fetch.');
-      await refreshDexcom();say(`${result.received} recent readings reconciled. Repeated fetches do not add duplicates.`);
+      await refreshDexcom();await loadRhythm();say(`${result.received} recent readings reconciled. Repeated fetches do not add duplicates.`);
     }catch(error){$('dexcom-status').textContent='Fetch not confirmed: '+(error.name==='TimeoutError'?'The request timed out. Try Refresh status before fetching again.':error.message);throw error;}
   });
   $('photo').onchange=async()=>{
