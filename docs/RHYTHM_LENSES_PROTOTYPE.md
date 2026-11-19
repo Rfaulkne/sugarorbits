@@ -1,0 +1,14 @@
+# Rhythm: three lenses, one thread
+
+Frontend-only prototype. Existing Supabase functions, authentication, reminder consent and Pi remain unchanged.
+
+- Week: seven completed Berlin calendar days, oldest inside, newest outside. Touch/hover a ring or use the day dial to isolate a day; centre shows that day's recorded-sample TIR and mean. Release direct touch to restore all days. The dial keeps its selection until All days.
+- Patterns: faint real daily rings plus coloured three-hour window markers. The same deterministic coverage/recurrence rule as the existing pattern chooser is used: at least three affected days and at least half the eligible days; eligible means at least 70% sample coverage, affected means three consecutive five-minute readings outside 3.9–10. No AI is called by changing lenses or choosing a marker.
+- Tap a marker or accessible window chip to see the exact clock period, affected/eligible counts, retained tag overlap, and the actual daily traces beneath. The trace range band is 3.9–10; missing intervals over ten minutes stay open. This is not an averaged event response. Time uses Europe/Berlin; repeated DST clock hours can overlap and are not connected backwards.
+- Explore this reveals an inline experiment field. Nothing is saved until Make this my focus; it calls the existing focus save path, using cloud mode if connected, otherwise explicitly labelled device-only mode. An active focus cannot be silently replaced. My focus then highlights the same window and links to its existing Coach/check-ins.
+- Just keep watching creates no plan/reminder. Not relevant hides a suggestion for this visit only, not the readings. Show all restores hidden suggestions. Dismissal choices are not sent to AI or saved long-term.
+- My focus uses the actual weekly mean, preceding-week line and threshold guides. Centre TIR remains whole-week TIR; the card separately labels the chosen-window before/during TIR and coverage. It never substitutes an event frequency for the glucose curve. Activity focus is explicitly tagged-activity context, not a specific inferred clock window.
+- The Focus navigation label is now Coach. The existing plan, check-ins, reflection, cloud configuration and notification controls remain available there. Coach calls remain explicit. Notifications are not enabled by this prototype.
+- Empty, sparse and missing days do not get synthetic rings or made-up patterns. The existing post-tap 1h/3h/6h viewer and Food Genie are preserved. No glucose/pump treatment advice is generated.
+
+Checks: `node tests/test_rhythm_lenses.cjs`, `node tests/test_cloud_phone.cjs`, plus existing rhythm/after-moment/focus/backend tests. Synthetic browser fixture is removed before publishing. Live iPhone touch ergonomics and actual-data presentation remain user device checks.

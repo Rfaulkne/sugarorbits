@@ -1,14 +1,15 @@
 // Generates a temporary synthetic browser QA page, never part of deployment.
 const fs=require('node:fs'),path=require('node:path');
 const target=process.argv[2];if(!target||!target.endsWith('/dist/__qa/rhythm.html'))throw new Error('Use the temporary dist/__qa/rhythm.html path.');
-let html=fs.readFileSync('cloud-phone/index.html','utf8').replace(/(href|src)="(style\.css|rhythm\.js|orbit-draw\.js|after-moment\.js|focus-core\.js|pwa\.js|app\.js|manifest\.webmanifest|app-icon-180\.png)/g,'$1="/moments/$2').replace(/<script src="\/moments\/pwa\.js[^>]*><\/script>/,'');
+let html=fs.readFileSync('cloud-phone/index.html','utf8').replace(/(href|src)="(style\.css|rhythm\.js|rhythm-lenses\.js|orbit-draw\.js|after-moment\.js|focus-core\.js|pwa\.js|app\.js|manifest\.webmanifest|app-icon-180\.png)/g,'$1="/moments/$2').replace(/<script src="\/moments\/pwa\.js[^>]*><\/script>/,'');
 const mock=`<script>
 // SYNTHETIC LAYOUT FIXTURE. Never calls a real API.
-const fixtureRows=[];for(let i=0;i<14*288;i++){const t=Date.now()-i*300000;const h=new Date(t).getUTCHours();fixtureRows.push({recorded_at:new Date(t).toISOString(),value_mg_dl:Math.round(125+55*Math.sin(h/24*Math.PI*2)+14*Math.sin(i/14))});}fixtureRows.sort((a,b)=>a.recorded_at.localeCompare(b.recorded_at));
+const fixtureRows=[];for(let i=0;i<14*288;i++){const t=Date.now()-i*300000;const h=new Date(t).getUTCHours();fixtureRows.push({recorded_at:new Date(t).toISOString(),value_mg_dl:h>=11&&h<14?216:Math.round(125+40*Math.sin(h/24*Math.PI*2)+14*Math.sin(i/14))});}fixtureRows.sort((a,b)=>a.recorded_at.localeCompare(b.recorded_at));
 window.OrbitPWA={enable:async()=> 'Synthetic fixture: no real notification permission was requested.',disable:async()=>{}};
-let fixturePlans=[{id:'fixture-focus',revision:1,expires_at:new Date(Date.now()+20*864e5).toISOString(),plan:{started:Date.now()-8*864e5,kind:'high',start:720,habit:'Notice the afternoon routine — synthetic test',status:'active',checkins:{},baseline:{eligible:7,high:.3,low:.01,range:.69},reminder:{enabled:false,lead:15,minute:1080,quiet_start:1320,quiet_end:480,frequency:7}}}];
+let fixturePlans=[];
 const fixtureFacts={before:{eligible:7,high:.3,low:.01,range:.69},after:{eligible:7,high:.1,low:.01,range:.89},outcome:{code:'improved',label:'A clearer improvement in the recorded window'},tags:{activity:2,stress:1,other:0}};
 function fixtureFocus(input){
+ if(input.action==='start')fixturePlans=[{id:'fixture-focus',revision:1,expires_at:new Date(Date.now()+28*864e5).toISOString(),plan:{started:Date.now(),kind:input.kind,start:input.start,habit:input.habit,status:'active',checkins:{},baseline:{eligible:7,high:.3,low:.01,range:.69},reminder:{enabled:false,lead:15,minute:1080,quiet_start:1320,quiet_end:480,frequency:7}}}];
  if(input.action==='checkin')fixturePlans[0].plan.checkins[window.OrbitRhythm.local(Date.now()).date]={status:input.status,note:input.note};
  if(input.action==='reminder')fixturePlans[0].plan.reminder=input.reminder;
  if(input.action==='reflect'){fixturePlans[0].plan.status='maintaining';fixturePlans[0].plan.reflection={worked:input.worked};}

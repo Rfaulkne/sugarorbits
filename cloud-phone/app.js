@@ -10,6 +10,16 @@
   let cameraStream=null,cameraGeneration=0,editingStaples=false;
   let rhythmRows=[],rhythmEvents=[],rhythmState=null,orbit=null;
   let chosenSuggestion=null;
+  let lenses=null;
+  function drawLenses(){
+    if(!window.OrbitLenses||!session)return;
+    if(!lenses)lenses=new window.OrbitLenses.Lenses({getFocus:readFocus,onCoach:()=>{setTab('focus');renderFocus();},onStart:(pattern,habit)=>run(async()=>{
+      chosenSuggestion=null;$('focus-kind').value=pattern.kind;$('focus-window').value=String(pattern.start);$('focus-habit').value=habit;await startFocus();lenses.setMode('focus');
+    })});
+    lenses.update(rhythmState,rhythmEvents);
+    const f=readFocus(),after=f?focusFacts?.after||focusMetrics(f):null;
+    $('lens-focus-progress').textContent=f?'Selected window · before '+pct(f.baseline?.range)+' / during '+pct(after?.range)+' in range. '+(after?.eligible||0)+' covered windows during. Compare highs, lows and coverage in Coach.':'';
+  }
   const R=window.OrbitRhythm;
   const A=window.OrbitAfterMoment;
   const F=window.OrbitFocusCore,SESSION_KEY='orbit-personal-session-v1';
@@ -107,6 +117,7 @@
     editingStaples=false;renderStaples();
     cloudReady=false;cloudKnown=false;cloudPlans=[];cloudConfig={};focusFacts=null;renderKept();$('focus-ai-answer').textContent='';$('focus-ai-ideas').replaceChildren();$('push-status').textContent='';$('cloud-focus-status').textContent='';$('move-local-focus').hidden=true;
     rhythmRows=[];rhythmEvents=[];rhythmState=null;afterKind='all';afterId=null;clearAfter();renderAfter();setTab(window.location?.hash==='#focus'?'focus':'rhythm');setQuickLog(true);
+    lenses?.update(null);
     for(const id of ['focus-habit','focus-note'])$(id).value='';
     for(const id of ['focus-title','focus-habit-copy','focus-progress','focus-comparison','focus-review-date','focus-checkin-status'])$(id).textContent='';
     $('rhythm-range').textContent='—';$('rhythm-coverage').textContent='Loading your recorded rhythm…';
@@ -222,12 +233,13 @@
   }
   function renderFocus(){
     const f=readFocus();$('focus-plan').hidden=!!f;$('focus-thread').hidden=!f;
+    $('move-local-focus').hidden=!!f||!cloudReady||!readLocalFocus();
     $('active-reminder-controls').hidden=!f?.cloud;
     $('coach-new-options').hidden=!!f;$('coach-active-note').hidden=!f;
     $('coach-suggestions').hidden=!!f;
     $('focus-window-label').hidden=$('focus-kind').value==='activity';
     $('focus-reflection').hidden=true;
-    if(!f){$('home-focus-title').textContent='What would you like to notice?';$('home-focus-description').textContent='Choose one period or explore tagged activity.';return;}
+    if(!f){$('home-focus-title').textContent='What would you like to notice?';$('home-focus-description').textContent='Explore a pattern in Rhythm, or choose your own observation.';drawLenses();return;}
     const elapsed=Math.floor((Date.now()-f.started)/864e5),review=elapsed>=7;
     const title=f.kind==='activity'?'Around tagged activity':`${f.kind==='high'?'Above':'Below'} range · ${clock(f.start)}–${clock(f.start+180)}`;
     $('home-focus-title').textContent=title;$('home-focus-description').textContent=review?'Your seven-day reflection is ready to revisit.':`Day ${Math.min(7,elapsed+1)} of 7 · ${f.habit}`;
@@ -246,6 +258,7 @@
     $('focus-reflection').hidden=!review||!f.cloud;$('focus-outcome-title').textContent=outcome?.label||'What would you like to keep?';
     $('focus-tags').textContent=focusFacts?'Tags in this window during your focus: '+Object.entries(focusFacts.tags).map(([kind,n])=>kind+' '+n).join(' · ')+'. Only your retained 20 taps are available; untagged context is unknown.':'Update progress to read the complete server-side window and tag counts.';
     const r=f.reminder||{};$('reminder-enabled').checked=!!r.enabled;$('reminder-lead').value=String(r.lead??15);$('reminder-time').value=clock(r.minute??1080);$('quiet-start').value=clock(r.quiet_start??1320);$('quiet-end').value=clock(r.quiet_end??480);
+    drawLenses();
   }
   function resetCoach(){chosenSuggestion=null;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
   const candidateTitle=c=>c.kind==='activity'?'Around tagged activity':`${c.kind==='high'?'Above':'Below'} range · ${clock(c.start)}–${clock(c.end)}`;
@@ -284,7 +297,8 @@
   $('focus-kind').onchange=()=>{clearSelection();$('focus-window-label').hidden=$('focus-kind').value==='activity';};
   $('focus-window').onchange=clearSelection;
   $('habit-ideas').onclick=event=>{const id=event.target?.dataset?.experiment;const ideas={tag:'Tag what is happening during this window.',routine:'Notice whether my routine differs on these days.',team:'Bring this recurring window to my diabetes team.'};if(!busy&&ideas[id])$('focus-habit').value=ideas[id];};
-  $('focus-plan').onsubmit=event=>{event.preventDefault();run(async()=>{
+  $('focus-plan').onsubmit=event=>{event.preventDefault();run(startFocus);};
+  async function startFocus(){
     if(readFocus())throw new Error('Finish the current focus before starting another.');
     const habit=$('focus-habit').value.trim();if(!habit)throw new Error('Describe one thing you will try or observe.');
     if(chosenSuggestion){if(Date.now()-chosenSuggestion.generated>15*60000)throw new Error('Request fresh AI choices before starting this focus.');await loadRhythm();}
@@ -293,7 +307,7 @@
     if(chosenSuggestion){if(!f.baseline||f.baseline.eligible<3)throw new Error('The latest baseline has insufficient coverage. Request a fresh review.');f.suggestion_id=chosenSuggestion.id;}
     if(cloudKnown){await cloudAction('start',{kind:f.kind,start:f.start,habit:f.habit},null);toast('Focus saved to your account ✓');}
     else{saveFocus(f);toast('Focus saved on this phone only ✓');}resetCoach();
-  });};
+  }
   async function checkIn(status){const f=readFocus();if(!f)return;const date=R?R.local(Date.now()).date:new Date().toISOString().slice(0,10);f.checkins=f.checkins||{};const entry={status:status||f.checkins[date]?.status||'note',note:$('focus-note').value.slice(0,240)};if(f.cloud)await cloudAction('checkin',entry);else{f.checkins[date]=entry;saveFocus(f);}toast('Check-in saved ✓');}
   document.querySelectorAll('[data-checkin]').forEach(b=>b.onclick=()=>run(async()=>checkIn(b.dataset.checkin)));
   $('save-focus-note').onclick=()=>run(async()=>checkIn(null));
@@ -316,7 +330,7 @@
     $('rhythm-period').textContent=R.shift(rhythmState.today,-7)+' to '+R.shift(rhythmState.today,-1)+' · Europe/Berlin';
     const bins=rhythmState.profile.filter(p=>p.mean!==null).length;
     $('rhythm-coverage').textContent=`${rhythmState.coveredDates} of 7 completed days have recorded samples; ${bins} of 48 clock sections can be drawn. `+(rhythmState.coveredDates<5?'Building a picture—do not interpret this as an established pattern.':'Averages describe available recordings; gaps and incomplete days can affect the shape.');
-    if(window.OrbitCanvas){if(!orbit)orbit=new window.OrbitCanvas($('rhythm-canvas'),{mini:true});orbit.draw(rhythmState);}
+    if(!window.OrbitLenses&&window.OrbitCanvas){if(!orbit)orbit=new window.OrbitCanvas($('rhythm-canvas'),{mini:true});orbit.draw(rhythmState);}
     let observations=[];for(let start=0;start<1440;start+=180){const m=R.metrics(rhythmState.current,start,start+180);if(m.eligible>=3){for(const [key,name]of [['affectedHigh','above'],['affectedLow','below']])if(m[key]>=3)observations.push(`${clock(start)}–${clock(start+180)}: 3 consecutive five-minute samples ${name} range on ${m[key]} of ${m.eligible} covered days.`);}}
     $('focus-observation').textContent=observations.length?observations.slice(0,2).join(' ')+' Observations, not explanations.':'No recurring period meets the current minimum of three affected, adequately covered days. You can still choose something to observe.';
     renderFocus();renderAfter();
@@ -333,7 +347,7 @@
     const events=await request('/rest/v1/orbit_events?select=id,kind,occurred_at&order=occurred_at.desc&limit=20',{},token);if(!Array.isArray(events))throw new Error('Could not load context tags.');
     if(current!==generation)return;rhythmRows=rows;rhythmEvents=events;paintRhythm();
   }
-  window.addEventListener('resize',()=>{if(orbit&&rhythmState&&session)orbit.draw(rhythmState);});
+  window.addEventListener('resize',()=>{if(!lenses&&orbit&&rhythmState&&session)orbit.draw(rhythmState);});
   const friendlySyncErrors={share_auth_failed:'Dexcom login failed. Check your saved credentials, region and Share setup.',share_unavailable:'Dexcom Share was unavailable.',no_readings:'Share returned no recent readings.',invalid_readings:'An unexpected value or timestamp was rejected.',storage_error:'Cloud storage setup needs checking.',connection_failed:'The collector could not connect.',session_expired:'The Share session could not be renewed.'};
   async function refreshDexcom(){
     const current=generation,token=await access();

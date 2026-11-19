@@ -1,0 +1,15 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),R=require('../cloud-phone/rhythm.js');
+const els=new Map(),get=id=>{if(!els.has(id))els.set(id,{hidden:false,value:'',textContent:'',children:[],setAttribute(k,v){this[k]=v},replaceChildren(){this.children=[]},append(x){this.children.push(x)}});return els.get(id)};
+const ctx={document:{getElementById:get,createElement:()=>({setAttribute(){}})},window:{OrbitRhythm:R,addEventListener(){}},Date,Math,Number,Map,Set,Object};vm.runInNewContext(fs.readFileSync('cloud-phone/rhythm-lenses.js','utf8'),ctx);
+let focus=null,starts=[],coach=0;const lens=new ctx.window.OrbitLenses.Lenses({getFocus:()=>focus,onStart:(p,h)=>starts.push({p,h}),onCoach:()=>coach++});
+const now=Date.parse('2026-11-19T12:00Z'),rows=[];for(let d=12;d<=18;d++)for(let m=0;m<1440;m+=5)rows.push({recorded_at:new Date(Date.parse(`2026-11-${d}T00:00Z`)+m*60000).toISOString(),value_mg_dl:m>=660&&m<840?216:126});
+lens.update(R.summarize(rows,[],now),[]);get('lens-patterns').onclick();assert.ok(get('lens-options').children.length);assert.equal(get('lens-choice').hidden,false);assert.equal(starts.length,0);
+get('lens-watch').onclick();assert.equal(starts.length,0);assert.ok(get('lens-response').textContent.includes('No focus or reminder'));
+get('lens-dismiss').onclick();assert.equal(lens.visible().length,0);get('lens-show-all').onclick();assert.ok(lens.visible().length);assert.equal(get('lens-response').textContent,'');
+get('lens-explore').onclick();assert.equal(get('lens-experiment').hidden,false);get('lens-intent').value='My own idea';get('lens-experiment').onsubmit({preventDefault(){}});assert.equal(starts.length,1);assert.equal(starts[0].h,'My own idea');
+focus={kind:'high',start:720,habit:'My own idea',started:now};lens.setMode('focus');assert.equal(get('lens-focus-copy').textContent,'My own idea');get('lens-coach').onclick();assert.equal(coach,1);
+lens.setMode('patterns');assert.equal(get('lens-explore').hidden,true);assert.equal(get('lens-existing').hidden,false);
+lens.setMode('week');get('lens-day').value='3';get('lens-day').oninput();assert.ok(get('lens-centre-label').textContent.includes('2026-11-14'));get('lens-all-days').onclick();assert.equal(lens.day,null);
+lens.update(null);assert.equal(lens.dismissed.size,0);assert.equal(lens.selected,null);assert.equal(get('lens-intent').value,'');
+const ids=[...fs.readFileSync('cloud-phone/index.html','utf8').matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(new Set(ids).size,ids.length,'HTML IDs must be unique');
+console.log('PASS: lens toggles, same-window context, watch/dismiss without writes, restore, explicit inline focus choice, active-plan protection, day dial, logout clearing and unique DOM IDs.');

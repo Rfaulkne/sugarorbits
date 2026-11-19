@@ -8,12 +8,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="app-icon-180.png">
 <title>Sugar Orbits · Rhythm</title>
-<link rel="stylesheet" href="style.css?v=20261119-focus-loop">
+<link rel="stylesheet" href="style.css?v=20261119-rhythm-lenses">
 <script src="rhythm.js" defer></script><script src="orbit-draw.js" defer></script>
 <script src="after-moment.js?v=20261119" defer></script>
 <script src="focus-core.js?v=20261119" defer></script>
+<script src="rhythm-lenses.js?v=20261119" defer></script>
 <script src="pwa.js?v=20261119" defer></script>
-<script src="app.js?v=20261119-focus-loop" defer></script>
+<script src="app.js?v=20261119-rhythm-lenses" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
   <details class="install-help"><summary>Keep Sugar Orbits on your phone</summary><p>Open this link in Safari, tap Share, then Add to Home Screen. Open the new icon to use app mode and enable reminders. Internet is required; health data is not cached for offline use.</p><p id="install-status" class="hint"></p></details>
@@ -29,7 +30,7 @@
     <p class="hint">Use your Sugar Orbits account—not your Dexcom password. Account creation is invitation-only during testing.</p>
   </section>
   <section id="moments" hidden>
-    <nav aria-label="Companion sections"><button data-tab="rhythm" aria-pressed="true">Rhythm</button><button data-tab="focus" aria-pressed="false">Focus</button><button data-tab="food" aria-pressed="false">Food Genie</button></nav>
+    <nav aria-label="Companion sections"><button data-tab="rhythm" aria-pressed="true">Rhythm</button><button data-tab="focus" aria-pressed="false">Coach</button><button data-tab="food" aria-pressed="false">Food Genie</button></nav>
     <div class="quick-head"><span>A moment of context</span><button id="quick-log-toggle" class="quiet" aria-expanded="true" aria-controls="quick-log">Hide quick log</button></div>
     <div id="quick-log"><div class="tags">
       <button data-kind="activity"><span>↗</span>Activity</button>
@@ -38,12 +39,23 @@
     </div>
     </div>
     <section id="panel-rhythm">
-      <p class="eyebrow rhythm-eyebrow">YOUR RHYTHM</p><h1 class="rhythm-title">Notice the shape.</h1>
+      <p class="eyebrow rhythm-eyebrow">YOUR RHYTHM · THREE LENSES</p><h1 class="rhythm-title" id="lens-title">One rhythm. Your perspective.</h1>
       <p id="rhythm-period" class="hint">Seven completed days · Europe/Berlin</p>
-      <div class="rhythm-orbit"><canvas id="rhythm-canvas" width="800" height="800" aria-label="Seven-day glucose profile and preceding week"></canvas><div class="rhythm-centre"><strong id="rhythm-range">—</strong><span>in range</span><small>recorded samples</small></div></div>
-      <div class="rhythm-legend"><span>Light · current week</span><span>Purple · preceding week</span><span>Guide circles · 3.9 / 10 mmol/L</span></div>
+      <div class="lens-switch" role="group" aria-label="Rhythm perspective"><button id="lens-week" aria-pressed="true">Week</button><button id="lens-patterns" aria-pressed="false">Patterns</button><button id="lens-focus" aria-pressed="false">My focus</button></div>
+      <div class="rhythm-orbit"><canvas id="rhythm-canvas" width="800" height="800" aria-label="Seven daily glucose rings"></canvas><div class="rhythm-centre"><strong id="rhythm-range">—</strong><span id="lens-centre-label">in range</span><small id="lens-centre-note">recorded samples</small></div></div>
+      <p id="lens-summary" class="hint lens-summary">Your recorded days will appear here.</p>
+      <div id="lens-day-controls"><label for="lens-day" id="lens-day-label">All seven days · oldest inside, newest outside</label><input id="lens-day" type="range" min="0" max="7" step="1" value="0" aria-label="Day dial: zero is all days, one is oldest, seven is newest"><button id="lens-all-days" class="quiet">All days</button></div>
+      <div id="lens-options" class="pattern-options" hidden></div>
+      <article id="lens-choice" class="card" hidden><p class="eyebrow">A POSSIBILITY, NOT A VERDICT</p><h2 id="lens-observation"></h2><p>Does anything about this time feel familiar?</p><p id="lens-context-tags" class="hint"></p><details><summary>What is behind this suggestion?</summary><p id="lens-evidence" class="hint"></p></details>
+        <div class="lens-decisions"><button id="lens-explore">Explore this</button><button id="lens-watch" class="secondary">Just keep watching</button><button id="lens-dismiss" class="quiet">Not relevant</button></div><p id="lens-existing" class="hint" hidden>You already have a focus. You can explore this evidence without replacing it; finish your current thread in Coach before choosing another.</p>
+        <form id="lens-experiment" hidden><label for="lens-intent">What would you like to try—or simply pay attention to?</label><input id="lens-intent" required maxlength="160" placeholder="My idea, in my own words"><p class="hint">You choose the experiment. No automatic AI request or reminder. Saving uses your connected cloud focus, or explicitly labelled device-only mode.</p><button type="submit">Make this my focus</button></form>
+      </article>
+      <p id="lens-response" class="hint" role="status" aria-live="polite"></p>
+      <article id="lens-focus-card" class="focus-card" hidden><span class="eyebrow">YOUR CHOSEN THREAD</span><strong id="lens-focus-title"></strong><p id="lens-focus-copy"></p><p id="lens-focus-progress" class="hint"></p><button id="lens-coach">Open my coach & check-in</button></article>
+      <section id="lens-trace-wrap" hidden><h2 id="lens-trace-title"></h2><canvas id="lens-trace" height="200" role="img" aria-label="Daily readings behind this window"></canvas><p class="hint">Actual daily paths, not an average. Purple is 3.9–10 mmol/L. Gaps over 10 minutes stay open. Clock labels use Europe/Berlin; repeated daylight-saving hours may overlap.</p></section>
+      <button id="lens-show-all" class="quiet">Show all pattern suggestions</button>
       <p id="rhythm-coverage" class="hint" role="status">Loading your recorded rhythm…</p>
-      <p class="hint">Orange/blue arcs show how often recorded samples were above/below range at that time—not that the average was outside it. Missing sections are not filled in.</p>
+      <p class="hint">Week: one ring per day, colour only where readings cross range. Patterns: grey daily rings with recurring-window markers. My focus: weekly mean with preceding-week comparison and 3.9 / 10 guides. Missing sections are never filled in.</p>
       <article class="after-moment card" aria-labelledby="after-title">
         <p class="eyebrow">YOUR TAPS · A CLOSER LOOK</p><h2 id="after-title">After a moment.</h2>
         <div id="after-filters" class="trace-controls" role="group" aria-label="Filter moments"></div>

@@ -34,12 +34,14 @@ const context={document:{getElementById:get,querySelectorAll:s=>s==='[data-kind]
  return {ok:true,text:async()=>data?JSON.stringify(data):''};}};
 context.window.OrbitAfterMoment=require('../cloud-phone/after-moment.js');
 context.window.OrbitFocusCore=require('../cloud-phone/focus-core.js');
+vm.runInNewContext(fs.readFileSync('cloud-phone/rhythm-lenses.js','utf8'),context);
 vm.runInNewContext(fs.readFileSync('cloud-phone/app.js','utf8'),context);
 const settle=()=>new Promise(r=>setImmediate(r));
 (async()=>{
  get('email').value='test@example.invalid';get('password').value='mock-password';get('login-form').onsubmit({preventDefault(){}});await settle();
  assert.equal(get('password').value,'');assert.equal(get('moments').hidden,false);
  assert.equal(get('panel-rhythm').hidden,false);assert.equal(get('quick-log').hidden,false);
+ assert.equal(get('lens-week')['aria-pressed'],'true');get('lens-patterns').onclick();assert.equal(get('lens-patterns')['aria-pressed'],'true');get('lens-focus').onclick();assert.equal(get('lens-focus-title').textContent,'Nothing chosen yet.');get('lens-week').onclick();
  tags[0].onclick();await settle();assert.equal(get('toast-label').textContent,'Logged ✓');assert.equal(get('toast').hidden,false);
  assert.equal(calls.filter(x=>x.opt.method==='POST'&&x.url.includes('/orbit_events')).length,1);
  assert.equal(get('quick-log').hidden,true);get('quick-log-toggle').onclick();assert.equal(get('quick-log').hidden,false);

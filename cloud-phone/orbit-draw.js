@@ -39,18 +39,19 @@
     curve(points,r,col,width,alpha,maxGap=35){
       const c=this.ctx;c.strokeStyle=col;c.lineWidth=width;c.globalAlpha=alpha;let running=false,previous=null;
       c.beginPath();
-      for(const p of points){if(p.mean===null){running=false;previous=null;continue;}const [x,y]=pos(p.minute,r(p));if(!running){c.moveTo(x,y);running=true;}else if(p.minute-previous.minute<=maxGap){const mid=(p.minute+previous.minute)/2,pr=pos(mid,(r(p)+r(previous))/2);c.quadraticCurveTo(...pr,x,y);}else c.moveTo(x,y);previous=p;}
+      for(const p of points){if(p.mean===null){running=false;previous=null;continue;}const [x,y]=pos(p.minute,r(p));if(!running){c.moveTo(x,y);running=true;}else if(p.minute>=previous.minute&&p.minute-previous.minute<=maxGap){const mid=(p.minute+previous.minute)/2,pr=pos(mid,(r(p)+r(previous))/2);c.quadraticCurveTo(...pr,x,y);}else c.moveTo(x,y);previous=p;}
       if(maxGap===35&&points.length===48&&points[0].mean!==null&&points[47].mean!==null){const end=pos(points[0].minute+1440,r(points[0]));c.lineTo(...end);}
       c.stroke();c.globalAlpha=1;
     }
     days(state){
       const c=this.ctx;
       for(let i=0;i<state.days.length;i++){
-        const day=state.days[i],chosen=this.selected===i,fade=this.selected===null||chosen?1:.16;
+        const day=state.days[i],chosen=this.selected===i,fade=state.mutedDays?.28:(this.selected===null||chosen?1:.16);
         const pts=day.points.map(p=>({minute:p.minute,mean:p.value}));const r=p=>Math.max(115,Math.min(338,168+i*22+(p.mean-6.8)*7));
         this.curve(pts,r,NS.current,chosen?2.5:1.3,.46*fade,12);
+        if(state.mutedDays)continue;
         for(let n=1;n<pts.length;n++){
-          const a=pts[n-1],b=pts[n];if(b.minute-a.minute>12)continue;
+          const a=pts[n-1],b=pts[n];if(b.minute<a.minute||b.minute-a.minute>12)continue;
           // Interpolate threshold crossings so orange/blue stops at the boundary.
           const cuts=[0,1];for(const level of [3.9,10])if((a.mean-level)*(b.mean-level)<0)cuts.push((level-a.mean)/(b.mean-a.mean));cuts.sort((x,y)=>x-y);
           for(let j=1;j<cuts.length;j++){const t0=cuts[j-1],t1=cuts[j],value=a.mean+(b.mean-a.mean)*(t0+t1)/2,col=value>10?NS.high:value<3.9?NS.low:null;if(!col)continue;c.strokeStyle=col;c.lineWidth=chosen?3.6:2.1;c.globalAlpha=fade*.9;c.beginPath();for(let k=0;k<=3;k++){const t=t0+(t1-t0)*k/3,p={minute:a.minute+(b.minute-a.minute)*t,mean:a.mean+(b.mean-a.mean)*t};const xy=pos(p.minute,r(p));k?c.lineTo(...xy):c.moveTo(...xy);}c.stroke();}
