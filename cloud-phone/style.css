@@ -2,3 +2,17 @@
 :root{--purple:#b4a4d0}nav{display:flex;gap:5px;background:#171d19;border-radius:20px;padding:5px;margin:24px 0}nav button{flex:1;background:transparent;color:#9fa79f;padding:12px 5px;font-size:13px}nav button[aria-pressed=true]{background:#c4d7a0;color:#142014}.card{padding:20px;border:1px solid #303b31;border-radius:22px;margin:24px 0}.card .eyebrow{margin-top:0}textarea{width:100%;margin-top:8px;padding:14px;font:inherit;border-radius:14px;background:#171d19;border:1px solid #394236;color:#fff}#photo{max-width:100%;margin-bottom:16px}#photo-preview{width:100%;max-height:300px;object-fit:contain;border-radius:20px;margin-top:14px}.photo-label{padding:20px;border:1px dashed #637258;border-radius:20px}.consent{display:flex;align-items:flex-start;gap:12px;line-height:1.5;color:#aab3a4}.consent input{width:20px;min-width:20px;height:20px;margin:0}#carbs{font-size:36px;font-weight:400;color:#c4d7a0}#toast{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(90%,430px);display:flex;align-items:center;justify-content:space-between;padding:9px 20px;border:1px solid #586748;border-radius:22px;background:#233024;box-shadow:0 10px 30px #0008;animation:toast-in .2s ease-out}@keyframes toast-in{from{opacity:0;translate:0 8px}to{opacity:1;translate:0 0}}#toast.fading{opacity:0;transition:opacity .4s}#assumptions{list-style:disc;padding-left:20px}#assumptions li{display:list-item;font-size:13px;color:#a5afa0}
 .food-actions{display:flex;gap:12px;margin:20px 0}.food-actions button{flex:1}.secondary{background:#222d23;color:#d4dfc9}.staples-head{display:flex;align-items:center;justify-content:space-between;margin-top:30px}.staples-head h3{font-size:14px;font-weight:400}.staples{display:flex;flex-wrap:wrap;gap:9px}.staple{display:flex;max-width:100%;align-items:center;border:1px solid #394738;border-radius:18px;overflow:hidden}.staple button{background:transparent;color:#d4dfc9;padding:12px 15px;max-width:100%;overflow-wrap:anywhere}.staple .remove-staple{color:#c6a9b1;border-left:1px solid #394738}#camera-dialog{width:min(94vw,460px);padding:22px;border-radius:26px;border:1px solid #4a5841;background:#101811;color:#e6eade}#camera-dialog::backdrop{background:#000c}#camera{width:100%;max-height:55vh;object-fit:cover;border-radius:18px;background:#000}#camera-status{font-size:13px}summary{cursor:pointer}#identify{margin-top:15px}
 #dexcom-value{font-size:2rem;font-weight:400;color:#c4d7a0}#dexcom-time,#dexcom-status{font-size:1rem}#dexcom-unit{font-size:.875rem;color:#aeb7a8}
+/* Phone fit: keep fields legible at normal zoom; never disable pinch zoom. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{min-width:0}
+main{width:100%;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+main,section,form,nav,.card,.food-actions,.staples,.staple{min-width:0}
+input,textarea,select{font-size:16px;min-width:0;max-width:100%}
+label{font-size:14px}
+button{max-width:100%;overflow-wrap:anywhere}
+nav button,.food-actions button{min-width:0}
+.tags{grid-template-columns:repeat(3,minmax(0,1fr))}
+h1{font-size:clamp(2rem,10vw,2.75rem)}
+p,#status,#dexcom-time,#dexcom-sync-time{overflow-wrap:anywhere}
+#camera-dialog{max-width:calc(100% - 24px);max-height:calc(100dvh - 32px);overflow-y:auto}
+@media(max-width:360px){main{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}.card{padding:16px}.food-actions{gap:8px}.food-actions button{padding:15px 10px}}
