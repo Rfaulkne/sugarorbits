@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),R=require('../cloud-phone/rhythm.js');
 const now=Date.now(),rows=[];
 for(let i=8*288;i>0;i--){const t=now-i*300000,m=R.local(t).minute;rows.push({recorded_at:new Date(t).toISOString(),value_mg_dl:m>=720&&m<900?216:126});}
-let handler,calls=[],dataset=rows,allowed=true,authenticated=true,picks=[{id:'high-720',question:'Would you like to explore this afternoon period?'}];
+let handler,calls=[],dataset=rows,events=[],allowed=true,authenticated=true,picks=[{id:'high-720',question:'Would you like to explore this afternoon period?'}];
 const ctx={Response,Uint8Array,TextEncoder,TextDecoder,Date,Map,Set,Number,JSON,Error,Array,Object,Intl,Math,encodeURIComponent,AbortSignal,
  Deno:{env:{get:()=> 'mock-only-secret'},serve:fn=>{handler=fn}},
  fetch:async(url,opt)=>{calls.push({url,opt});
@@ -9,7 +9,7 @@ const ctx={Response,Uint8Array,TextEncoder,TextDecoder,Date,Map,Set,Number,JSON,
   if(url.includes('/rest/')){
     assert.equal(opt.headers.Authorization,'Bearer aaa.bbb.ccc');
     if(url.includes('orbit_claim_food'))return Response.json(allowed);
-    if(url.includes('orbit_events?'))return Response.json([]);
+    if(url.includes('orbit_events?'))return Response.json(events);
     const gt=new URL(url).searchParams.getAll('recorded_at').find(x=>x.startsWith('gt.'))?.slice(3);
     return Response.json(dataset.filter(r=>!gt||r.recorded_at>gt).slice(0,1000));
   }
@@ -33,5 +33,11 @@ const req=(body={consent:true},headers={})=>new Request('https://test.invalid/co
  picks=[{id:'high-720',question:'There were 99 events.'}];assert.equal((await handler(req())).status,502);
  picks=[{id:'high-720',question:'Could lunch be causing this?'}];assert.equal((await handler(req())).status,502);
  picks=[{id:'high-720',question:'Explore this period?'},{id:'high-720',question:'Explore this period?'}];assert.equal((await handler(req())).status,502);
+ dataset=rows.map(r=>({...r,value_mg_dl:126}));events=[1,2,3].map(d=>({kind:'stress',occurred_at:new Date(now-d*864e5-3*3600e3).toISOString()}));picks=[{id:'stress',question:'Would you like to notice what follows your stress tags?'}];
+ let tagged=await (await handler(req({consent:true,tag_kind:'stress'}))).json();assert.equal(tagged.suggestions[0].kind,'stress');assert.equal(tagged.suggestions[0].outcome,'in_range');assert.equal(tagged.suggestions[0].current.distinct_days,3);
+ const starts=events.map(e=>Date.parse(e.occurred_at));dataset=dataset.map(r=>({...r,value_mg_dl:starts.some(t=>Date.parse(r.recorded_at)>=t&&Date.parse(r.recorded_at)<t+7200000)?54:126}));
+ tagged=await (await handler(req({consent:true,tag_kind:'stress'}))).json();assert.equal(tagged.suggestions[0].outcome,'low');
+ events=events.map(e=>({...e,kind:'activity'}));picks=[{id:'activity',question:'Would you like to explore your tagged activity windows?'}];tagged=await (await handler(req({consent:true,tag_kind:'activity'}))).json();assert.equal(tagged.suggestions[0].kind,'activity');
+ events=[events[0],events[0],events[0]];const priorCalls=calls.filter(c=>c.url.includes('api.openai')).length;assert.equal((await (await handler(req({consent:true,tag_kind:'activity'}))).json()).mode,'insufficient_data');assert.equal(calls.filter(c=>c.url.includes('api.openai')).length,priorCalls);
  console.log('PASS: mocked auth/consent/owner-scoped fetches, pagination, stale/insufficient-data gates, quota, AI candidate IDs, aggregate-only payload, unsafe/invented/duplicate drafts rejected. No live AI calls.');
 })().catch(e=>{console.error(e);process.exitCode=1});

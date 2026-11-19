@@ -28,7 +28,7 @@ const context={document:{getElementById:get,querySelectorAll:s=>s==='[data-kind]
   if(input.action==='reflect'){cloudRecords[0].plan.status='maintaining';cloudRecords[0].plan.reflection={worked:input.worked};}
   if(input.action==='finish')cloudRecords[0].plan.status='completed';
   const facts={before:baseline,after:{eligible:6,high:.1,low:.01,range:.89},outcome:{code:'improved',label:'A clearer improvement in the recorded window'},tags:{activity:2,stress:1,other:0}};
-  data=input.action==='review'?{facts}:input.action==='coach'?{facts,question:'What felt useful, and what would you like to keep?',ideas:['Tag the context.']}:{plans:cloudRecords,reminders_configured:true,vapid_public_key:'test-public'};
+  data=input.action==='review'?{facts}:input.action==='coach'?{facts,question:'What felt useful, and what would you like to keep?',ideas:['Tag the context.']}:{plans:cloudRecords,tag_focus_version:2,reminders_configured:true,vapid_public_key:'test-public'};
  }
  else if(url.includes('/functions/'))data={foods:['rice'],carbs_low_g:30,carbs_high_g:50,question:'',assumptions:['Portion supplied.']};}
  return {ok:true,text:async()=>data?JSON.stringify(data):''};}};
@@ -98,6 +98,7 @@ const settle=()=>new Promise(r=>setImmediate(r));
  get('focus-ask').onclick();await settle();assert.ok(get('focus-ai-answer').textContent.includes('What felt useful'));
  get('reminder-enabled').checked=true;get('save-reminder').onclick();await settle();assert.equal(cloudRecords[0].plan.reminder.enabled,true);
  get('focus-worked').value='The short notes helped me notice';get('keep-focus').onclick();await settle();assert.equal(get('focus-thread').hidden,true);assert.equal(get('kept-list').children.length,1);
+ get('focus-kind').value='stress';get('focus-window').value='0';get('focus-habit').value='Notice my stress context';get('focus-plan').onsubmit({preventDefault(){}});await settle();assert.equal(cloudRecords[0].plan.kind,'stress');assert.equal(get('focus-title').textContent,'After tagged stress');assert.equal(get('focus-window-label').hidden,true);
  get('logout').onclick();await settle();assert.equal(storage.has('orbit-personal-session-v1'),false);assert.equal(get('kept-list').children.length,0);
  console.log('PASS: mocked login, tag/Undo, tabs, direct entry, default/save/remove account-scoped favourites, camera fallback, consent, estimates and logout cleanup. No live requests.');
 })().catch(e=>{console.error(e);process.exitCode=1});

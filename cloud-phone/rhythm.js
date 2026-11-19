@@ -58,6 +58,16 @@
       eligible++;range+=values.filter(r=>r.v>=3.9&&r.v<=10).length/values.length;high+=values.filter(r=>r.v>10).length/values.length;low+=values.filter(r=>r.v<3.9).length/values.length;}
     return {eligible,range:eligible?range/eligible:null,high:eligible?high/eligible:null,low:eligible?low/eligible:null};
   }
-  const api={local,shift,samples,summarize,metrics,activityMetrics,expected};
+  function tagMetrics(group,events,kind,from,to){
+    const tags=events.filter(e=>e.kind===kind).map(e=>Date.parse(e.at||e.occurred_at)).filter(t=>Number.isFinite(t)&&t>=from&&t+7200000<=to).sort((a,b)=>a-b);
+    const windows=[];let last=-Infinity;
+    for(const t of tags){if(t<last)continue;const bins=new Map();for(const p of group)if(p.t>=t&&p.t<t+7200000)bins.set(Math.floor((p.t-t)/300000),p);
+      if(bins.size<17)continue;last=t+7200000;const a=[...bins.values()].sort((a,b)=>a.t-b.t),v=a.map(p=>p.v);
+      const episode=pred=>a.some((p,i)=>i>=2&&pred(p.v)&&pred(a[i-1].v)&&pred(a[i-2].v)&&p.t-a[i-1].t<=360000&&a[i-1].t-a[i-2].t<=360000);
+      windows.push({date:local(t).date,high:v.filter(x=>x>10).length/v.length,low:v.filter(x=>x<3.9).length/v.length,range:v.filter(x=>x>=3.9&&x<=10).length/v.length,above:episode(x=>x>10),below:episode(x=>x<3.9)});
+    }
+    return {eligible:windows.length,distinctDays:new Set(windows.map(w=>w.date)).size,high:mean(windows.map(w=>w.high)),low:mean(windows.map(w=>w.low)),range:mean(windows.map(w=>w.range)),affectedHigh:windows.filter(w=>w.above).length,affectedLow:windows.filter(w=>w.below).length};
+  }
+  const api={local,shift,samples,summarize,metrics,activityMetrics,tagMetrics,expected};
   if(typeof module!=='undefined')module.exports=api;else window.OrbitRhythm=api;
 })();

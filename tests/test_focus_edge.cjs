@@ -33,5 +33,6 @@ const req=(body,origin='https://sugar-orbits-pocket-preview.firmvale1.chatgpt.si
  assert.equal((await handler(req({action:'reflect',id,revision:2,worked:'Helpful'}))).status,400);
  assert.equal((await handler(req({action:'subscribe',subscription:{endpoint:'http://127.0.0.1/',keys:{}}}))).status,400);
  allowed=false;assert.equal((await handler(req({action:'coach',id,consent:true}))).status,429);
+ plans=[];assert.equal((await handler(req({action:'start',kind:'stress',start:0,habit:'Notice what follows my stress tags'}))).status,200);assert.equal(plans[0].plan.kind,'stress');assert.equal(typeof plans[0].plan.baseline.distinctDays,'number');
  console.log('PASS: mocked focus auth, RLS owner scope, start/baseline, check-in, revision conflict, missing focus, aggregate-only AI, invalid output rejection, early reflection and invalid push endpoint rejection.');
 })().catch(e=>{console.error(e);process.exitCode=1});

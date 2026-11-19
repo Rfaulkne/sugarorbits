@@ -10,10 +10,12 @@
   let cameraStream=null,cameraGeneration=0,editingStaples=false;
   let rhythmRows=[],rhythmEvents=[],rhythmState=null,orbit=null;
   let chosenSuggestion=null;
+  let coachContext=null;
+  const tagged=kind=>['activity','stress'].includes(kind);
   let lenses=null;
   function drawLenses(){
     if(!window.OrbitLenses||!session)return;
-    if(!lenses)lenses=new window.OrbitLenses.Lenses({getFocus:readFocus,onCoach:observation=>{setTab('focus');renderFocus();$('calm-coach-context').hidden=!observation;if(observation)$('calm-coach-context').textContent=observation.type==='tag'?'From Rhythm: after '+observation.kind+' · '+observation.label+'. Calculated association, not an AI verdict. Stress-tag focus tracking is not connected yet.':'From Rhythm: '+clock(observation.start)+'–'+clock(observation.end)+' · recurring '+(observation.kind==='high'?'highs':'lows')+'.';},onStart:(pattern,habit)=>run(async()=>{
+    if(!lenses)lenses=new window.OrbitLenses.Lenses({getFocus:readFocus,onCoach:observation=>{setTab('focus');renderFocus();coachContext=observation?.type==='tag'?observation.kind:null;$('calm-coach-context').hidden=!observation;if(observation)$('calm-coach-context').textContent=observation.type==='tag'?'After '+observation.kind+' · '+observation.label+'. AI reviews the last seven days of recorded tag windows.':'Recurring '+(observation.kind==='high'?'highs':'lows')+' · '+clock(observation.start)+'–'+clock(observation.end)+'.';if(coachContext&&!readFocus())$('coach-find').onclick();},onStart:(pattern,habit)=>run(async()=>{
       chosenSuggestion=null;$('focus-kind').value=pattern.kind;$('focus-window').value=String(pattern.start);$('focus-habit').value=habit;await startFocus();lenses.setMode('focus');
     })});
     lenses.update(rhythmState,rhythmEvents);
@@ -225,11 +227,12 @@
   function focusKey(){return session?.user?.id?'orbit-focus-phone-v1:'+session.user.id:null;}
   function readFocus(){const record=currentRecord();return cloudKnown?(record?{...record.plan,id:record.id,revision:record.revision,cloud:true}:null):readLocalFocus();}
   function readLocalFocus(){try{const f=JSON.parse(localStorage.getItem(focusKey())||'null');if(!f)return null;
-    if(!['high','low','activity'].includes(f.kind)||!Number.isFinite(f.started)||f.started>Date.now()||Date.now()-f.started>28*864e5||typeof f.habit!=='string'||f.habit.length>160||!Number.isInteger(f.start)||f.start<0||f.start>1260){if(focusKey())localStorage.removeItem(focusKey());return null;}return f;
+    if(!['high','low','activity','stress'].includes(f.kind)||!Number.isFinite(f.started)||f.started>Date.now()||Date.now()-f.started>28*864e5||typeof f.habit!=='string'||f.habit.length>160||!Number.isInteger(f.start)||f.start<0||f.start>1260){if(focusKey())localStorage.removeItem(focusKey());return null;}return f;
   }catch{return null;}}
   function saveFocus(f){const key=focusKey();if(!key)throw new Error('Sign in again before saving a focus.');localStorage.setItem(key,JSON.stringify(f));renderFocus();}
   function focusMetrics(f,baseline=false){if(!rhythmState||!R)return null;
-    if(f.kind==='activity')return R.activityMetrics(rhythmState.all,rhythmEvents,baseline?f.started-7*864e5:f.started,baseline?f.started:Math.min(Date.now(),f.started+7*864e5));
+    if(tagged(f.kind)&&baseline&&f.baseline)return f.baseline;
+    if(tagged(f.kind))return R.tagMetrics(rhythmState.all,rhythmEvents,f.kind,baseline?f.started-7*864e5:f.started,baseline?f.started:Math.min(Date.now(),f.started+7*864e5));
     return R.metrics(baseline?rhythmState.current:rhythmState.all,f.start,f.start+180,baseline?-Infinity:f.started,baseline?f.started:Math.min(Date.now(),f.started+7*864e5));
   }
   function renderFocus(){
@@ -238,11 +241,11 @@
     $('active-reminder-controls').hidden=!f?.cloud;
     $('coach-new-options').hidden=!!f;$('coach-active-note').hidden=!f;
     $('coach-suggestions').hidden=!!f;
-    $('focus-window-label').hidden=$('focus-kind').value==='activity';
+    $('focus-window-label').hidden=tagged($('focus-kind').value);
     $('focus-reflection').hidden=true;
     if(!f){$('home-focus-title').textContent='What would you like to notice?';$('home-focus-description').textContent='Explore a pattern in Rhythm, or choose your own observation.';drawLenses();return;}
     const elapsed=Math.floor((Date.now()-f.started)/864e5),review=elapsed>=7;
-    const title=f.kind==='activity'?'Around tagged activity':`${f.kind==='high'?'Above':'Below'} range · ${clock(f.start)}–${clock(f.start+180)}`;
+    const title=tagged(f.kind)?'After tagged '+f.kind:`${f.kind==='high'?'Above':'Below'} range · ${clock(f.start)}–${clock(f.start+180)}`;
     $('home-focus-title').textContent=title;$('home-focus-description').textContent=review?'Your seven-day reflection is ready to revisit.':`Day ${Math.min(7,elapsed+1)} of 7 · ${f.habit}`;
     $('focus-stage').textContent=review?'SEVEN-DAY REFLECTION':`DAY ${elapsed+1} OF 7`;$('focus-title').textContent=title;$('focus-habit-copy').textContent=f.habit;
     $('focus-review-date').textContent='Review from '+new Date(f.started+7*864e5).toLocaleDateString()+'. '+(f.cloud?'Saved to your private cloud account.':'Device-only plan; cloud setup pending.');
@@ -251,29 +254,30 @@
     $('focus-checkin-status').textContent=entry?(names[entry.status]||'Checked in')+' today. You can change it.':'No check-in needed to keep exploring.';$('focus-note').value=typeof entry?.note==='string'?entry.note:'';
     $('focus-prompt').textContent=review?'What did you notice? Continue, adjust or finish—there is no automatic “resolved” verdict.':'How did your chosen experiment fit today?';
     const current=focusFacts?.after||focusMetrics(f),base=focusFacts?.before||f.baseline;
-    const describe=m=>m&&m.eligible?`${m.eligible} covered ${f.kind==='activity'?'activity windows':'days'} · ${pct(m.range)} in range · ${pct(m.high)} above · ${pct(m.low)} below`:'Not enough covered windows to describe yet.';
+    const describe=m=>m&&m.eligible?`${m.eligible} covered ${tagged(f.kind)?'tagged windows':'days'} · ${pct(m.range)} in range · ${pct(m.high)} above · ${pct(m.low)} below`:'Not enough covered windows to describe yet.';
     $('focus-progress').textContent='Recorded samples — Before: '+describe(base)+' During: '+describe(current);
-    const enough=base?.eligible>=5&&current?.eligible>=5;
-    $('focus-comparison').textContent=(enough?'Both periods have at least five covered windows. These are descriptive observations, not evidence that your experiment caused a change.':'Comparison is provisional: at least five covered windows in each period are needed before interpreting a change.')+(f.kind==='activity'?' Activity means the two hours after a tag; overlapping tags are combined. Untagged activity is unknown.':' Only complete three-hour windows with at least 70% sample coverage are counted.');
+    const enough=base?.eligible>=5&&current?.eligible>=5&&(!tagged(f.kind)||base.distinctDays>=3&&current.distinctDays>=3);
+    $('focus-comparison').textContent=(enough?'Both periods have at least five covered windows. These are descriptive observations, not evidence that your experiment caused a change.':'Comparison is provisional: at least five covered windows in each period are needed before interpreting a change.')+(tagged(f.kind)?' Two hours after the selected tag type; overlaps are excluded. At least three distinct tagged days per period are needed. The saved baseline is fixed; retained tags may limit follow-up.':' Only complete three-hour windows with at least 70% sample coverage are counted.');
     const outcome=focusFacts?.outcome||F?.evaluate(f.kind,base,current,Date.now()-f.started);
     $('focus-reflection').hidden=!review||!f.cloud;$('focus-outcome-title').textContent=outcome?.label||'What would you like to keep?';
     $('focus-tags').textContent=focusFacts?'Tags in this window during your focus: '+Object.entries(focusFacts.tags).map(([kind,n])=>kind+' '+n).join(' · ')+'. Only your retained 20 taps are available; untagged context is unknown.':'Update progress to read the complete server-side window and tag counts.';
     const r=f.reminder||{};$('reminder-enabled').checked=!!r.enabled;$('reminder-lead').value=String(r.lead??15);$('reminder-time').value=clock(r.minute??1080);$('quiet-start').value=clock(r.quiet_start??1320);$('quiet-end').value=clock(r.quiet_end??480);
     drawLenses();
   }
-  function resetCoach(){chosenSuggestion=null;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
-  const candidateTitle=c=>c.kind==='activity'?'Around tagged activity':`${c.kind==='high'?'Above':'Below'} range · ${clock(c.start)}–${clock(c.end)}`;
+  function resetCoach(){coachContext=null;chosenSuggestion=null;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
+  const candidateTitle=c=>tagged(c.kind)?'After tagged '+c.kind:`${c.kind==='high'?'Above':'Below'} range · ${clock(c.start)}–${clock(c.end)}`;
   function validateChoice(c){
     const validFraction=n=>n===null||typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=1;
-    return c&&['high','low','activity'].includes(c.kind)&&typeof c.id==='string'&&typeof c.question==='string'&&c.question.length>0&&c.question.length<=240&&
-      (c.kind==='activity'?c.id==='activity'&&c.start===0&&c.end===1440:Number.isInteger(c.start)&&c.start>=0&&c.start<=1260&&c.start%180===0&&c.end===c.start+180&&c.id===c.kind+'-'+c.start)&&
-      [c.current,c.previous].every(m=>m&&Number.isInteger(m.eligible)&&m.eligible>=0&&m.eligible<=20&&[m.above,m.below,m.in_range].every(validFraction))&&c.current.eligible>=3;
+    return c&&['high','low','activity','stress'].includes(c.kind)&&typeof c.id==='string'&&typeof c.question==='string'&&c.question.length>0&&c.question.length<=240&&
+      (tagged(c.kind)?c.id===c.kind&&c.start===0&&c.end===1440:Number.isInteger(c.start)&&c.start>=0&&c.start<=1260&&c.start%180===0&&c.end===c.start+180&&c.id===c.kind+'-'+c.start)&&
+      [c.current,c.previous].every(m=>m&&Number.isInteger(m.eligible)&&m.eligible>=0&&m.eligible<=20&&[m.above,m.below,m.in_range].every(validFraction))&&c.current.eligible>=3&&(!tagged(c.kind)||Number.isInteger(c.current.distinct_days)&&c.current.distinct_days>=3);
   }
   $('coach-find').onclick=()=>run(async()=>{
     if(readFocus())throw new Error('Finish the current focus before choosing another.');
+    if(coachContext&&cloudConfig.tag_focus_version!==2)throw new Error('Deploy the updated orbit-focus and orbit-coach functions, then Refresh cloud focus to enable tag coaching.');
     $('coach-status').textContent='Checking coverage and preparing a few choices…';$('coach-suggestions').replaceChildren();chosenSuggestion=null;$('selected-focus-note').hidden=true;
     try{
-      const result=await request('/functions/v1/orbit-coach',{method:'POST',body:JSON.stringify({consent:true})},await access());
+      const result=await request('/functions/v1/orbit-coach',{method:'POST',body:JSON.stringify({consent:true,...(coachContext?{tag_kind:coachContext}:{})})},await access());
       if(['insufficient_data','stale_data'].includes(result.mode)){$('coach-status').textContent=result.message||'Not enough recent covered data yet. You can choose an observation yourself.';return;}
       const generated=Date.parse(result.generated_at),choices=result.suggestions;
       if(result.mode!=='ai_assisted'||!Number.isFinite(generated)||generated>Date.now()+60000||Date.now()-generated>15*60000||!Array.isArray(choices)||choices.length<1||choices.length>3||!choices.every(validateChoice)||new Set(choices.map(c=>c.id)).size!==choices.length)throw new Error('The AI choices could not be validated. Nothing was selected.');
@@ -282,30 +286,31 @@
         const card=document.createElement('article');card.className='coach-choice';const title=document.createElement('h3');title.textContent=candidateTitle(c);
         const question=document.createElement('p');question.textContent=c.question;const facts=document.createElement('p');facts.className='hint';
         const affected=c.kind==='high'?c.current.affected_high_days:c.current.affected_low_days;
-        facts.textContent=(c.kind==='activity'?`${c.current.eligible} covered tagged windows`: `${Number.isInteger(affected)?affected:'—'} of ${c.current.eligible} covered days affected`)+` · ${pct(c.current.in_range)} in range · ${pct(c.current.above)} above · ${pct(c.current.below)} below.`+(c.preliminary?' Preliminary coverage.':'');
+        facts.textContent=(tagged(c.kind)?`${c.current.eligible} covered tagged windows on ${c.current.distinct_days} days`: `${Number.isInteger(affected)?affected:'—'} of ${c.current.eligible} covered days affected`)+` · ${pct(c.current.in_range)} in range · ${pct(c.current.above)} above · ${pct(c.current.below)} below.`+(c.preliminary?' Preliminary coverage.':'')+(c.outcome==='in_range'?' A pattern you may want to keep, not a problem to fix.':'');
         if(c.tag_context)facts.textContent+=' Tags recorded in this window: '+['activity','stress','other'].map(k=>k+' '+(Number.isInteger(c.tag_context[k])?c.tag_context[k]:0)).join(' · ')+'. Incomplete context, not causes.';
-        const reference=document.createElement('p');reference.className='hint';reference.textContent=c.previous.eligible>=3?`Preceding period: ${c.previous.eligible} covered windows · ${pct(c.previous.in_range)} in range. This is context, not a causal comparison.`:'Preceding period has too few covered windows for a useful comparison.';
+        const reference=document.createElement('p');reference.className='hint';reference.textContent=c.previous.eligible>=3&&(!tagged(c.kind)||c.previous.distinct_days>=3)?`Preceding period: ${c.previous.eligible} covered windows · ${pct(c.previous.in_range)} in range. This is context, not a causal comparison.`:'Preceding period has too few covered windows for a useful comparison.';
         const choose=document.createElement('button');choose.textContent='Choose this focus';choose.onclick=()=>{if(busy)return;
           if(Date.now()-generated>15*60000){$('coach-status').textContent='These choices are over 15 minutes old. Request a fresh review.';return;}
-          chosenSuggestion={id:c.id,kind:c.kind,start:c.kind==='activity'?0:c.start,generated};$('focus-kind').value=c.kind;$('focus-window').value=String(c.kind==='activity'?0:c.start);$('focus-window-label').hidden=c.kind==='activity';
+          chosenSuggestion={id:c.id,kind:c.kind,start:tagged(c.kind)?0:c.start,generated};$('focus-kind').value=c.kind;$('focus-window').value=String(tagged(c.kind)?0:c.start);$('focus-window-label').hidden=tagged(c.kind);
           $('selected-focus-note').textContent='Chosen: '+candidateTitle(c)+'. Now describe what you want to try or observe.';$('selected-focus-note').hidden=false;$('focus-plan').scrollIntoView?.({behavior:'smooth',block:'start'});
         };
         card.append(title,question,facts,reference,choose);$('coach-suggestions').append(card);
       }
     }catch(error){$('coach-status').textContent=error.message;throw error;}
   });
-  const clearSelection=()=>{chosenSuggestion=null;$('selected-focus-note').hidden=true;};
-  $('focus-kind').onchange=()=>{clearSelection();$('focus-window-label').hidden=$('focus-kind').value==='activity';};
+  const clearSelection=()=>{coachContext=null;chosenSuggestion=null;$('selected-focus-note').hidden=true;};
+  $('focus-kind').onchange=()=>{clearSelection();$('focus-window-label').hidden=tagged($('focus-kind').value);};
   $('focus-window').onchange=clearSelection;
   $('habit-ideas').onclick=event=>{const id=event.target?.dataset?.experiment;const ideas={tag:'Tag what is happening during this window.',routine:'Notice whether my routine differs on these days.',team:'Bring this recurring window to my diabetes team.'};if(!busy&&ideas[id])$('focus-habit').value=ideas[id];};
   $('focus-plan').onsubmit=event=>{event.preventDefault();run(startFocus);};
   async function startFocus(){
     if(readFocus())throw new Error('Finish the current focus before starting another.');
     const habit=$('focus-habit').value.trim();if(!habit)throw new Error('Describe one thing you will try or observe.');
+    if($('focus-kind').value==='stress'&&cloudKnown&&cloudConfig.tag_focus_version!==2)throw new Error('Update orbit-focus and Refresh cloud focus before saving a stress focus.');
     if(chosenSuggestion){if(Date.now()-chosenSuggestion.generated>15*60000)throw new Error('Request fresh AI choices before starting this focus.');await loadRhythm();}
     const f={started:Date.now(),kind:$('focus-kind').value,start:Number($('focus-window').value),habit,checkins:{}};
     f.baseline=focusMetrics(f,true);
-    if(chosenSuggestion){if(!f.baseline||f.baseline.eligible<3)throw new Error('The latest baseline has insufficient coverage. Request a fresh review.');f.suggestion_id=chosenSuggestion.id;}
+    if(chosenSuggestion){if(!f.baseline||f.baseline.eligible<3||tagged(f.kind)&&f.baseline.distinctDays<3)throw new Error('The latest baseline has insufficient coverage. Request a fresh review.');f.suggestion_id=chosenSuggestion.id;}
     if(cloudKnown){await cloudAction('start',{kind:f.kind,start:f.start,habit:f.habit},null);toast('Focus saved to your account ✓');}
     else{saveFocus(f);toast('Focus saved on this phone only ✓');}resetCoach();
   }

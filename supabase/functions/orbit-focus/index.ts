@@ -60,7 +60,17 @@ const window={};
       eligible++;range+=values.filter(r=>r.v>=3.9&&r.v<=10).length/values.length;high+=values.filter(r=>r.v>10).length/values.length;low+=values.filter(r=>r.v<3.9).length/values.length;}
     return {eligible,range:eligible?range/eligible:null,high:eligible?high/eligible:null,low:eligible?low/eligible:null};
   }
-  const api={local,shift,samples,summarize,metrics,activityMetrics,expected};
+  function tagMetrics(group,events,kind,from,to){
+    const tags=events.filter(e=>e.kind===kind).map(e=>Date.parse(e.at||e.occurred_at)).filter(t=>Number.isFinite(t)&&t>=from&&t+7200000<=to).sort((a,b)=>a-b);
+    const windows=[];let last=-Infinity;
+    for(const t of tags){if(t<last)continue;const bins=new Map();for(const p of group)if(p.t>=t&&p.t<t+7200000)bins.set(Math.floor((p.t-t)/300000),p);
+      if(bins.size<17)continue;last=t+7200000;const a=[...bins.values()].sort((a,b)=>a.t-b.t),v=a.map(p=>p.v);
+      const episode=pred=>a.some((p,i)=>i>=2&&pred(p.v)&&pred(a[i-1].v)&&pred(a[i-2].v)&&p.t-a[i-1].t<=360000&&a[i-1].t-a[i-2].t<=360000);
+      windows.push({date:local(t).date,high:v.filter(x=>x>10).length/v.length,low:v.filter(x=>x<3.9).length/v.length,range:v.filter(x=>x>=3.9&&x<=10).length/v.length,above:episode(x=>x>10),below:episode(x=>x<3.9)});
+    }
+    return {eligible:windows.length,distinctDays:new Set(windows.map(w=>w.date)).size,high:mean(windows.map(w=>w.high)),low:mean(windows.map(w=>w.low)),range:mean(windows.map(w=>w.range)),affectedHigh:windows.filter(w=>w.above).length,affectedLow:windows.filter(w=>w.below).length};
+  }
+  const api={local,shift,samples,summarize,metrics,activityMetrics,tagMetrics,expected};
   if(typeof module!=='undefined')module.exports=api;else window.OrbitRhythm=api;
 })();
 
@@ -70,11 +80,13 @@ const window={};
   function evaluate(kind,before,after,elapsed){
     if(elapsed<7*DAY)return {code:'observing',label:'Still observing'};
     if(!before||!after||before.eligible<5||after.eligible<5)return {code:'insufficient',label:'More covered windows needed'};
+    if(['activity','stress'].includes(kind)&&(before.distinctDays<3||after.distinctDays<3||!Number.isInteger(before.distinctDays)||!Number.isInteger(after.distinctDays)))return {code:'insufficient',label:'More distinct tagged days needed'};
     const target=kind==='low'?'low':kind==='high'?'high':'range';
     const improved=target==='range'?after.range-before.range>=.1:before[target]-after[target]>=.05&&after[target]<=before[target]*.5;
     const tradeoff=after.low>before.low+.01||after.high>before.high+.05;
     if(improved&&!tradeoff)return {code:'improved',label:'A clearer improvement in the recorded window'};
     if(tradeoff)return {code:'mixed',label:'A mixed picture—review highs and lows together'};
+    if(['activity','stress'].includes(kind)&&before.range>=.7&&after.range>=before.range-.03)return {code:'maintained',label:'In-range coverage broadly maintained'};
     return {code:'similar',label:'No clear improvement in the recorded window yet'};
   }
   function context(samples,events,start,end,from,to,R){
@@ -85,13 +97,15 @@ const window={};
   }
   function measures(plan,rows,events,R,now=Date.now()){
     const samples=R.samples(rows,now),start=plan.started,end=Math.min(now,start+7*DAY);
-    const before=plan.kind==='activity'?R.activityMetrics(samples,events,start-7*DAY,start):R.metrics(samples,plan.start,plan.start+180,start-7*DAY,start);
-    const after=plan.kind==='activity'?R.activityMetrics(samples,events,start,end):R.metrics(samples,plan.start,plan.start+180,start,end);
-    return {before,after,outcome:evaluate(plan.kind,before,after,now-start),tags:context(samples,events,plan.kind==='activity'?0:plan.start,plan.kind==='activity'?1440:plan.start+180,start,end,R),latest:samples.at(-1)?.t||null};
+    const tagged=['activity','stress'].includes(plan.kind);
+    // Server-created aggregate baseline survives pruning of the newest-20 raw tags.
+    const before=tagged?(plan.baseline||R.tagMetrics(samples,events,plan.kind,start-7*DAY,start)):R.metrics(samples,plan.start,plan.start+180,start-7*DAY,start);
+    const after=tagged?R.tagMetrics(samples,events,plan.kind,start,end):R.metrics(samples,plan.start,plan.start+180,start,end);
+    return {before,after,outcome:evaluate(plan.kind,before,after,now-start),tags:context(samples,events,tagged?0:plan.start,tagged?1440:plan.start+180,start,end,R),latest:samples.at(-1)?.t||null};
   }
   function due(plan,now,R){
     const r=plan.reminder;if(!r?.enabled||!['active','maintaining'].includes(plan.status)||now>=plan.started+28*DAY||now<plan.started)return null;
-    const {date,minute}=R.local(now),at=((plan.kind==='activity'?r.minute:plan.start)-(r.lead||0)+1440)%1440;
+    const {date,minute}=R.local(now),at=((['activity','stress'].includes(plan.kind)?r.minute:plan.start)-(r.lead||0)+1440)%1440;
     const quiet=r.quiet_start===r.quiet_end?false:r.quiet_start<r.quiet_end?minute>=r.quiet_start&&minute<r.quiet_end:minute>=r.quiet_start||minute<r.quiet_end;
     if(quiet||minute<at||minute>=at+15)return null;
     const elapsed=Math.floor((now-plan.started)/DAY),type=plan.status==='maintaining'?'keep':elapsed>=7?'review':'checkin';
@@ -132,7 +146,7 @@ async function handler(req){
   const db=async(path,method='GET',body=null,privateUser=false)=>{const r=await fetch(PROJECT+'/rest/v1/'+path,{method,headers:{apikey:privateUser?KEY:service,Authorization:privateUser?auth:'Bearer '+service,'Content-Type':'application/json',Prefer:'return=representation'},...(body===null?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('storage');return r.status===204?null:r.json();};
   const now=Date.now(),owner='user_id=eq.'+user.id;
   const list=async()=>db('orbit_focus_plans?select=id,plan,revision,expires_at&'+owner+'&expires_at=gt.'+encodeURIComponent(new Date(now).toISOString())+'&order=created_at.desc&limit=5','GET',null,true);
-  const config=()=>({vapid_public_key:Deno.env.get('ORBIT_VAPID_PUBLIC_KEY')||null,reminders_configured:!!(Deno.env.get('ORBIT_VAPID_PRIVATE_KEY')&&Deno.env.get('ORBIT_REMINDER_TOKEN'))});
+  const config=()=>({vapid_public_key:Deno.env.get('ORBIT_VAPID_PUBLIC_KEY')||null,tag_focus_version:2,reminders_configured:!!(Deno.env.get('ORBIT_VAPID_PRIVATE_KEY')&&Deno.env.get('ORBIT_REMINDER_TOKEN'))});
   if(input.action==='list')return reply(200,{plans:await list(),...config()});
   if(input.action==='subscribe'){
    if(!config().reminders_configured||!safeSub(input.subscription))return reply(400,{message:'Push is not configured or this browser subscription is unsupported.'});
@@ -148,7 +162,7 @@ async function handler(req){
   const plans=await list();let record=input.id?plans.find(p=>p.id===input.id):null;
   if(input.action==='start'){
    if(plans.some(p=>p.plan.status==='active'))return reply(409,{message:'Refresh your active focus before starting another.'});
-   if(!['high','low','activity'].includes(input.kind)||!Number.isInteger(input.start)||input.start<0||input.start>1260||input.start%180!==0||typeof input.habit!=='string'||!input.habit.trim()||input.habit.length>160)return reply(400,{message:'Choose a window and one short experiment.'});
+   if(!['high','low','activity','stress'].includes(input.kind)||!Number.isInteger(input.start)||input.start<0||input.start>1260||input.start%180!==0||typeof input.habit!=='string'||!input.habit.trim()||input.habit.length>160)return reply(400,{message:'Choose a window and one short experiment.'});
    const plan={started:now,kind:input.kind,start:input.start,habit:input.habit.trim(),status:'active',checkins:{},reminder:{enabled:false,lead:15,minute:1080,quiet_start:1320,quiet_end:480,frequency:7}};
    const h=await history(auth,now-8*864e5,now);plan.baseline=F.measures(plan,h.rows,h.events,R,now).before;
    const id=crypto.randomUUID();await db('rpc/orbit_write_focus','POST',{p_owner:user.id,p_id:id,p_revision:0,p_plan:plan});return reply(200,{plans:await list()});
@@ -162,7 +176,7 @@ async function handler(req){
    if(!facts.latest||now-facts.latest>864e5)return reply(200,{facts,question:prompts.coverage,ideas:[],mode:'stale_data'});
    const quota=await db('rpc/orbit_claim_food_request','POST',{},true);if(quota!==true)return reply(429,{message:'Wait ten seconds. Focus and Food share twenty AI requests per day.'});
    const api=Deno.env.get('OPENAI_API_KEY');if(!api)return reply(503,{message:'AI is not configured.'});
-   const allowed=facts.outcome.code==='improved'?['reflect','context']:facts.outcome.code==='mixed'?['mixed','context']:facts.outcome.code==='insufficient'?['coverage','context']:['context','small','today'];
+   const allowed=['improved','maintained'].includes(facts.outcome.code)?['reflect','context']:facts.outcome.code==='mixed'?['mixed','context']:facts.outcome.code==='insufficient'?['coverage','context']:['context','small','today'];
    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+api,'Content-Type':'application/json'},signal:AbortSignal.timeout(40000),body:JSON.stringify({model:'gpt-4.1-mini',store:false,max_output_tokens:300,instructions:'Choose one suitable gentle reflection question and up to two observation ideas from the supplied identifiers. Context tags are incomplete and are associations, not causes. Do not infer meals, exercise intensity, stress causes, treatment changes or that a pattern is solved. No free text: select identifiers only. Favor low effort. All statistics are computed, not yours to change.',input:JSON.stringify({kind:plan.kind,phase:facts.outcome.code,before:facts.before,after:facts.after,tags:facts.tags,checkins:Object.values(plan.checkins||{}).reduce((a,c)=>(a[c.status]=(a[c.status]||0)+1,a),{}),allowed_questions:allowed,question_library:prompts,idea_library:experiments}),text:{format:{type:'json_schema',name:'focus_reflection',strict:true,schema:{type:'object',additionalProperties:false,properties:{question:{type:'string',enum:allowed},ideas:{type:'array',items:{type:'string',enum:Object.keys(experiments)}}},required:['question','ideas']}}}})});
    if(!response.ok)throw Error('ai');const output=await response.json();if(output.status!=='completed')throw Error('ai');const draft=JSON.parse((output.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join(''));
    if(!allowed.includes(draft.question)||!Array.isArray(draft.ideas)||draft.ideas.length>2||draft.ideas.some(x=>!experiments[x])||new Set(draft.ideas).size!==draft.ideas.length)throw Error('ai');

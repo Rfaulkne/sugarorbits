@@ -60,7 +60,17 @@ const window={};
       eligible++;range+=values.filter(r=>r.v>=3.9&&r.v<=10).length/values.length;high+=values.filter(r=>r.v>10).length/values.length;low+=values.filter(r=>r.v<3.9).length/values.length;}
     return {eligible,range:eligible?range/eligible:null,high:eligible?high/eligible:null,low:eligible?low/eligible:null};
   }
-  const api={local,shift,samples,summarize,metrics,activityMetrics,expected};
+  function tagMetrics(group,events,kind,from,to){
+    const tags=events.filter(e=>e.kind===kind).map(e=>Date.parse(e.at||e.occurred_at)).filter(t=>Number.isFinite(t)&&t>=from&&t+7200000<=to).sort((a,b)=>a-b);
+    const windows=[];let last=-Infinity;
+    for(const t of tags){if(t<last)continue;const bins=new Map();for(const p of group)if(p.t>=t&&p.t<t+7200000)bins.set(Math.floor((p.t-t)/300000),p);
+      if(bins.size<17)continue;last=t+7200000;const a=[...bins.values()].sort((a,b)=>a.t-b.t),v=a.map(p=>p.v);
+      const episode=pred=>a.some((p,i)=>i>=2&&pred(p.v)&&pred(a[i-1].v)&&pred(a[i-2].v)&&p.t-a[i-1].t<=360000&&a[i-1].t-a[i-2].t<=360000);
+      windows.push({date:local(t).date,high:v.filter(x=>x>10).length/v.length,low:v.filter(x=>x<3.9).length/v.length,range:v.filter(x=>x>=3.9&&x<=10).length/v.length,above:episode(x=>x>10),below:episode(x=>x<3.9)});
+    }
+    return {eligible:windows.length,distinctDays:new Set(windows.map(w=>w.date)).size,high:mean(windows.map(w=>w.high)),low:mean(windows.map(w=>w.low)),range:mean(windows.map(w=>w.range)),affectedHigh:windows.filter(w=>w.above).length,affectedLow:windows.filter(w=>w.below).length};
+  }
+  const api={local,shift,samples,summarize,metrics,activityMetrics,tagMetrics,expected};
   if(typeof module!=='undefined')module.exports=api;else window.OrbitRhythm=api;
 })();
 
@@ -89,11 +99,13 @@ function candidatesFor(rows,events,now=Date.now()){
       out.push({id:kind+'-'+start,kind,start,end:start+180,unit:'covered days',current:compact(current),previous:compact(previous),tag_context,preliminary:current.eligible<5});
     }
   }
-  const tags=events.filter(e=>e.kind==='activity');
-  // Activity associations are deliberately limited to the recorded tag windows.
-  const currentActivity=R.activityMetrics(state.all,tags,now-7*864e5,now),previousActivity=R.activityMetrics(state.all,tags,now-14*864e5,now-7*864e5);
-  if(currentActivity.eligible>=3&&currentActivity.high+currentActivity.low>=.05)
-    out.push({id:'activity',kind:'activity',start:0,end:1440,unit:'covered tagged windows',current:compact(currentActivity),previous:compact(previousActivity),preliminary:currentActivity.eligible<5});
+  for(const kind of ['activity','stress']){
+    const current=R.tagMetrics(state.all,events,kind,now-7*864e5,now),previous=R.tagMetrics(state.all,events,kind,now-14*864e5,now-7*864e5);
+    if(current.eligible<3||current.distinctDays<3)continue;
+    const outcome=current.affectedHigh>=current.eligible/2&&current.affectedLow>=current.eligible/2?'mixed':current.affectedHigh>=current.eligible/2?'high':current.affectedLow>=current.eligible/2?'low':current.range>=.7?'in_range':'mixed';
+    const stats=m=>({...compact(m),distinct_days:m.distinctDays,affected_high_days:null,affected_low_days:null,affected_high_windows:m.affectedHigh,affected_low_windows:m.affectedLow});
+    out.push({id:kind,kind,start:0,end:1440,unit:'covered tagged windows',outcome,current:stats(current),previous:stats(previous),preliminary:current.eligible<5});
+  }
   return {state,candidates:out};
 }
 async function handler(req){
@@ -110,7 +122,7 @@ async function handler(req){
     let input;try{input=await readBody(req);}catch{return reply(400,{message:'Invalid request.'});}
     if(input.consent!==true)return reply(400,{message:'Confirm sharing aggregate pattern summaries with OpenAI for this request.'});
     // No client-provided patterns, habits, notes or prompts are accepted.
-    if(Object.keys(input).some(k=>k!=='consent'))return reply(400,{message:'Only the consent flag is accepted.'});
+    if(Object.keys(input).some(k=>!['consent','tag_kind'].includes(k))||(input.tag_kind!==undefined&&!['activity','stress'].includes(input.tag_kind)))return reply(400,{message:'Only consent and an optional activity/stress filter are accepted.'});
     const get=async path=>{const result=await fetch(PROJECT+'/rest/v1/'+path,{headers:{apikey:PUBLIC_KEY,Authorization:auth},signal:AbortSignal.timeout(10000)});if(!result.ok)throw new Error('storage');return result.json();};
     const now=Date.now(),cutoff=new Date(now-16*864e5).toISOString();let rows=[],cursor=null,complete=false;
     for(let page=0;page<20;page++){
@@ -120,7 +132,7 @@ async function handler(req){
     }
     if(!complete)throw new Error('storage');
     const events=await get('orbit_events?select=kind,occurred_at&order=occurred_at.desc&limit=20');if(!Array.isArray(events))throw new Error('storage');
-    const {state,candidates}=candidatesFor(rows,events,now);
+    const calculated=candidatesFor(rows,events,now),state=calculated.state,candidates=calculated.candidates.filter(c=>!input.tag_kind||c.kind===input.tag_kind);
     const latest=state.all[state.all.length-1]?.t;
     if(!latest||now-latest>864e5)return reply(200,{mode:'stale_data',suggestions:[],message:'Recent readings are missing or over a day old. Check collection before asking the coach.'});
     if(!candidates.length)return reply(200,{mode:'insufficient_data',suggestions:[],message:'No period currently meets the minimum of three affected, adequately covered days or qualifying activity windows. No AI request was made.'});
@@ -129,8 +141,8 @@ async function handler(req){
     const schema={type:'object',additionalProperties:false,properties:{picks:{type:'array',items:{type:'object',additionalProperties:false,properties:{id:{type:'string',enum:candidates.map(c=>c.id)},question:{type:'string'}},required:['id','question']}}},required:['picks']};
     const result=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},signal:AbortSignal.timeout(40000),body:JSON.stringify({
       model:'gpt-4.1-mini',store:false,max_output_tokens:700,
-      instructions:'Help a person choose one observational glucose-pattern focus. Select one to three DISTINCT IDs only from the supplied calculated candidates, ordered for an understandable, low-burden choice. Prefer adequate coverage, avoid redundant overlapping choices and acknowledge preliminary data. For each, write ONE short gentle question inviting curiosity, not a prescribed habit or action. Associations, never causes. No insulin, medication, doses, pump settings, treatment, diagnoses, reassurance or advice about managing glucose. No numbers or statistics in your question: the app separately displays verified facts. Do not state that one period improved, worsened, is safe or is resolved. No inferred meals, sleep, stress or gym visits: those contexts were not measured. Refer only to clock periods or explicitly tagged activity. Do not invent any pattern or explanation. Return only the requested schema.',
-      input:JSON.stringify({timezone:'Europe/Berlin',period:'seven completed days; preceding seven days for reference',activity_definition:'two hours after a logged activity tag; not all exercise is tagged',candidates}),text:{format:{type:'json_schema',name:'focus_choices',strict:true,schema}}
+      instructions:'Help a person choose one observational glucose-pattern focus. Select one to three DISTINCT IDs only from the supplied calculated candidates, ordered for an understandable, low-burden choice. Prefer adequate coverage, avoid redundant overlapping choices and acknowledge preliminary data. For each, write ONE short gentle question inviting curiosity, not a prescribed habit or action. Associations, never causes. No insulin, medication, doses, pump settings, treatment, diagnoses, reassurance or advice about managing glucose. No numbers or statistics in your question: the app separately displays verified facts. Do not state that one period improved, worsened, is safe or is resolved. No inferred meals, sleep, stress causes or gym visits. Refer only to clock periods or explicitly tagged activity/stress. In-range tag associations may be useful to maintain, not problems to fix. Tag types are observations, not causes. Do not invent any pattern or explanation. Return only the requested schema.',
+      input:JSON.stringify({timezone:'Europe/Berlin',period:'seven completed days; preceding seven days for reference',tag_definition:'two hours after an activity or stress tag; incomplete logging; each window needs 70% coverage, at least three distinct days; overlaps excluded',candidates}),text:{format:{type:'json_schema',name:'focus_choices',strict:true,schema}}
     })});
     if(!result.ok)return reply(502,{message:'AI suggestions are unavailable. Check API credit/model access; no automatic retry was made.'});
     const output=await result.json();if(output.status!=='completed')throw new Error('draft');
@@ -139,8 +151,9 @@ async function handler(req){
     const used=new Set(),suggestions=[];
     for(const pick of draft.picks){const candidate=candidates.find(c=>c.id===pick.id);
       if(!candidate||used.has(pick.id)||typeof pick.question!=='string'||pick.question.length>240||!pick.question.trim())throw new Error('draft');
+      if(candidate.kind!=='stress'&&/stress/i.test(pick.question))throw new Error('draft');
       // Additional fail-closed guard; not a clinically validated safety classifier.
-      if(/\d|insulin|basal|bolus|dos(e|ing|age)|pump|medicat|treat|diagnos|caus|because|due to|led to|lead to|result of|improv|worsen|resolv|meal|lunch|dinner|breakfast|gym|workout|stress|\bsafe\b|\bshould\b|\bmust\b/i.test(pick.question))throw new Error('draft');
+      if(/\d|insulin|basal|bolus|dos(e|ing|age)|pump|medicat|treat|diagnos|caus|because|due to|led to|lead to|result of|improv|worsen|resolv|meal|lunch|dinner|breakfast|gym|workout|\bsafe\b|\bshould\b|\bmust\b/i.test(pick.question))throw new Error('draft');
       used.add(pick.id);suggestions.push({...candidate,question:pick.question});
     }
     return reply(200,{mode:'ai_assisted',suggestions,generated_at:new Date(now).toISOString(),message:'Calculated observations, AI-assisted choices. You decide what to explore; no causal or treatment conclusions.'});

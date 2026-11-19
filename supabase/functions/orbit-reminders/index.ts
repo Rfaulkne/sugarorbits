@@ -60,7 +60,17 @@ const window={};
       eligible++;range+=values.filter(r=>r.v>=3.9&&r.v<=10).length/values.length;high+=values.filter(r=>r.v>10).length/values.length;low+=values.filter(r=>r.v<3.9).length/values.length;}
     return {eligible,range:eligible?range/eligible:null,high:eligible?high/eligible:null,low:eligible?low/eligible:null};
   }
-  const api={local,shift,samples,summarize,metrics,activityMetrics,expected};
+  function tagMetrics(group,events,kind,from,to){
+    const tags=events.filter(e=>e.kind===kind).map(e=>Date.parse(e.at||e.occurred_at)).filter(t=>Number.isFinite(t)&&t>=from&&t+7200000<=to).sort((a,b)=>a-b);
+    const windows=[];let last=-Infinity;
+    for(const t of tags){if(t<last)continue;const bins=new Map();for(const p of group)if(p.t>=t&&p.t<t+7200000)bins.set(Math.floor((p.t-t)/300000),p);
+      if(bins.size<17)continue;last=t+7200000;const a=[...bins.values()].sort((a,b)=>a.t-b.t),v=a.map(p=>p.v);
+      const episode=pred=>a.some((p,i)=>i>=2&&pred(p.v)&&pred(a[i-1].v)&&pred(a[i-2].v)&&p.t-a[i-1].t<=360000&&a[i-1].t-a[i-2].t<=360000);
+      windows.push({date:local(t).date,high:v.filter(x=>x>10).length/v.length,low:v.filter(x=>x<3.9).length/v.length,range:v.filter(x=>x>=3.9&&x<=10).length/v.length,above:episode(x=>x>10),below:episode(x=>x<3.9)});
+    }
+    return {eligible:windows.length,distinctDays:new Set(windows.map(w=>w.date)).size,high:mean(windows.map(w=>w.high)),low:mean(windows.map(w=>w.low)),range:mean(windows.map(w=>w.range)),affectedHigh:windows.filter(w=>w.above).length,affectedLow:windows.filter(w=>w.below).length};
+  }
+  const api={local,shift,samples,summarize,metrics,activityMetrics,tagMetrics,expected};
   if(typeof module!=='undefined')module.exports=api;else window.OrbitRhythm=api;
 })();
 
@@ -70,11 +80,13 @@ const window={};
   function evaluate(kind,before,after,elapsed){
     if(elapsed<7*DAY)return {code:'observing',label:'Still observing'};
     if(!before||!after||before.eligible<5||after.eligible<5)return {code:'insufficient',label:'More covered windows needed'};
+    if(['activity','stress'].includes(kind)&&(before.distinctDays<3||after.distinctDays<3||!Number.isInteger(before.distinctDays)||!Number.isInteger(after.distinctDays)))return {code:'insufficient',label:'More distinct tagged days needed'};
     const target=kind==='low'?'low':kind==='high'?'high':'range';
     const improved=target==='range'?after.range-before.range>=.1:before[target]-after[target]>=.05&&after[target]<=before[target]*.5;
     const tradeoff=after.low>before.low+.01||after.high>before.high+.05;
     if(improved&&!tradeoff)return {code:'improved',label:'A clearer improvement in the recorded window'};
     if(tradeoff)return {code:'mixed',label:'A mixed picture—review highs and lows together'};
+    if(['activity','stress'].includes(kind)&&before.range>=.7&&after.range>=before.range-.03)return {code:'maintained',label:'In-range coverage broadly maintained'};
     return {code:'similar',label:'No clear improvement in the recorded window yet'};
   }
   function context(samples,events,start,end,from,to,R){
@@ -85,13 +97,15 @@ const window={};
   }
   function measures(plan,rows,events,R,now=Date.now()){
     const samples=R.samples(rows,now),start=plan.started,end=Math.min(now,start+7*DAY);
-    const before=plan.kind==='activity'?R.activityMetrics(samples,events,start-7*DAY,start):R.metrics(samples,plan.start,plan.start+180,start-7*DAY,start);
-    const after=plan.kind==='activity'?R.activityMetrics(samples,events,start,end):R.metrics(samples,plan.start,plan.start+180,start,end);
-    return {before,after,outcome:evaluate(plan.kind,before,after,now-start),tags:context(samples,events,plan.kind==='activity'?0:plan.start,plan.kind==='activity'?1440:plan.start+180,start,end,R),latest:samples.at(-1)?.t||null};
+    const tagged=['activity','stress'].includes(plan.kind);
+    // Server-created aggregate baseline survives pruning of the newest-20 raw tags.
+    const before=tagged?(plan.baseline||R.tagMetrics(samples,events,plan.kind,start-7*DAY,start)):R.metrics(samples,plan.start,plan.start+180,start-7*DAY,start);
+    const after=tagged?R.tagMetrics(samples,events,plan.kind,start,end):R.metrics(samples,plan.start,plan.start+180,start,end);
+    return {before,after,outcome:evaluate(plan.kind,before,after,now-start),tags:context(samples,events,tagged?0:plan.start,tagged?1440:plan.start+180,start,end,R),latest:samples.at(-1)?.t||null};
   }
   function due(plan,now,R){
     const r=plan.reminder;if(!r?.enabled||!['active','maintaining'].includes(plan.status)||now>=plan.started+28*DAY||now<plan.started)return null;
-    const {date,minute}=R.local(now),at=((plan.kind==='activity'?r.minute:plan.start)-(r.lead||0)+1440)%1440;
+    const {date,minute}=R.local(now),at=((['activity','stress'].includes(plan.kind)?r.minute:plan.start)-(r.lead||0)+1440)%1440;
     const quiet=r.quiet_start===r.quiet_end?false:r.quiet_start<r.quiet_end?minute>=r.quiet_start&&minute<r.quiet_end:minute>=r.quiet_start||minute<r.quiet_end;
     if(quiet||minute<at||minute>=at+15)return null;
     const elapsed=Math.floor((now-plan.started)/DAY),type=plan.status==='maintaining'?'keep':elapsed>=7?'review':'checkin';

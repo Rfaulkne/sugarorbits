@@ -28,7 +28,7 @@ async function handler(req){
   const db=async(path,method='GET',body=null,privateUser=false)=>{const r=await fetch(PROJECT+'/rest/v1/'+path,{method,headers:{apikey:privateUser?KEY:service,Authorization:privateUser?auth:'Bearer '+service,'Content-Type':'application/json',Prefer:'return=representation'},...(body===null?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('storage');return r.status===204?null:r.json();};
   const now=Date.now(),owner='user_id=eq.'+user.id;
   const list=async()=>db('orbit_focus_plans?select=id,plan,revision,expires_at&'+owner+'&expires_at=gt.'+encodeURIComponent(new Date(now).toISOString())+'&order=created_at.desc&limit=5','GET',null,true);
-  const config=()=>({vapid_public_key:Deno.env.get('ORBIT_VAPID_PUBLIC_KEY')||null,reminders_configured:!!(Deno.env.get('ORBIT_VAPID_PRIVATE_KEY')&&Deno.env.get('ORBIT_REMINDER_TOKEN'))});
+  const config=()=>({vapid_public_key:Deno.env.get('ORBIT_VAPID_PUBLIC_KEY')||null,tag_focus_version:2,reminders_configured:!!(Deno.env.get('ORBIT_VAPID_PRIVATE_KEY')&&Deno.env.get('ORBIT_REMINDER_TOKEN'))});
   if(input.action==='list')return reply(200,{plans:await list(),...config()});
   if(input.action==='subscribe'){
    if(!config().reminders_configured||!safeSub(input.subscription))return reply(400,{message:'Push is not configured or this browser subscription is unsupported.'});
@@ -44,7 +44,7 @@ async function handler(req){
   const plans=await list();let record=input.id?plans.find(p=>p.id===input.id):null;
   if(input.action==='start'){
    if(plans.some(p=>p.plan.status==='active'))return reply(409,{message:'Refresh your active focus before starting another.'});
-   if(!['high','low','activity'].includes(input.kind)||!Number.isInteger(input.start)||input.start<0||input.start>1260||input.start%180!==0||typeof input.habit!=='string'||!input.habit.trim()||input.habit.length>160)return reply(400,{message:'Choose a window and one short experiment.'});
+   if(!['high','low','activity','stress'].includes(input.kind)||!Number.isInteger(input.start)||input.start<0||input.start>1260||input.start%180!==0||typeof input.habit!=='string'||!input.habit.trim()||input.habit.length>160)return reply(400,{message:'Choose a window and one short experiment.'});
    const plan={started:now,kind:input.kind,start:input.start,habit:input.habit.trim(),status:'active',checkins:{},reminder:{enabled:false,lead:15,minute:1080,quiet_start:1320,quiet_end:480,frequency:7}};
    const h=await history(auth,now-8*864e5,now);plan.baseline=F.measures(plan,h.rows,h.events,R,now).before;
    const id=crypto.randomUUID();await db('rpc/orbit_write_focus','POST',{p_owner:user.id,p_id:id,p_revision:0,p_plan:plan});return reply(200,{plans:await list()});
@@ -58,7 +58,7 @@ async function handler(req){
    if(!facts.latest||now-facts.latest>864e5)return reply(200,{facts,question:prompts.coverage,ideas:[],mode:'stale_data'});
    const quota=await db('rpc/orbit_claim_food_request','POST',{},true);if(quota!==true)return reply(429,{message:'Wait ten seconds. Focus and Food share twenty AI requests per day.'});
    const api=Deno.env.get('OPENAI_API_KEY');if(!api)return reply(503,{message:'AI is not configured.'});
-   const allowed=facts.outcome.code==='improved'?['reflect','context']:facts.outcome.code==='mixed'?['mixed','context']:facts.outcome.code==='insufficient'?['coverage','context']:['context','small','today'];
+   const allowed=['improved','maintained'].includes(facts.outcome.code)?['reflect','context']:facts.outcome.code==='mixed'?['mixed','context']:facts.outcome.code==='insufficient'?['coverage','context']:['context','small','today'];
    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+api,'Content-Type':'application/json'},signal:AbortSignal.timeout(40000),body:JSON.stringify({model:'gpt-4.1-mini',store:false,max_output_tokens:300,instructions:'Choose one suitable gentle reflection question and up to two observation ideas from the supplied identifiers. Context tags are incomplete and are associations, not causes. Do not infer meals, exercise intensity, stress causes, treatment changes or that a pattern is solved. No free text: select identifiers only. Favor low effort. All statistics are computed, not yours to change.',input:JSON.stringify({kind:plan.kind,phase:facts.outcome.code,before:facts.before,after:facts.after,tags:facts.tags,checkins:Object.values(plan.checkins||{}).reduce((a,c)=>(a[c.status]=(a[c.status]||0)+1,a),{}),allowed_questions:allowed,question_library:prompts,idea_library:experiments}),text:{format:{type:'json_schema',name:'focus_reflection',strict:true,schema:{type:'object',additionalProperties:false,properties:{question:{type:'string',enum:allowed},ideas:{type:'array',items:{type:'string',enum:Object.keys(experiments)}}},required:['question','ideas']}}}})});
    if(!response.ok)throw Error('ai');const output=await response.json();if(output.status!=='completed')throw Error('ai');const draft=JSON.parse((output.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join(''));
    if(!allowed.includes(draft.question)||!Array.isArray(draft.ideas)||draft.ideas.length>2||draft.ideas.some(x=>!experiments[x])||new Set(draft.ideas).size!==draft.ideas.length)throw Error('ai');

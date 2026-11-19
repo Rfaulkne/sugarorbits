@@ -14,7 +14,7 @@
 <script src="focus-core.js?v=20261119" defer></script>
 <script src="rhythm-calm.js?v=20261119" defer></script>
 <script src="pwa.js?v=20261119" defer></script>
-<script src="app.js?v=20261119-calm-rhythm" defer></script>
+<script src="app.js?v=20261119-tag-coaching" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
   <details class="install-help"><summary>Keep Sugar Orbits on your phone</summary><p>Open this link in Safari, tap Share, then Add to Home Screen. Open the new icon to use app mode and enable reminders. Internet is required; health data is not cached for offline use.</p><p id="install-status" class="hint"></p></details>
@@ -97,7 +97,7 @@
       <p id="selected-focus-note" class="hint" hidden></p>
       <form id="focus-plan" class="card">
         <h2>Your choice, your experiment.</h2><p class="hint">Pick an AI suggestion above, or choose a period yourself below.</p>
-        <label>What are you curious about?<select id="focus-kind"><option value="high">Periods above range</option><option value="low">Periods below range</option><option value="activity">Around tagged activity</option></select></label>
+        <label>What are you curious about?<select id="focus-kind"><option value="high">Periods above range</option><option value="low">Periods below range</option><option value="activity">After activity</option><option value="stress">After stress</option></select></label>
         <label id="focus-window-label">Time of day<select id="focus-window"><option value="0">00:00–03:00</option><option value="180">03:00–06:00</option><option value="360">06:00–09:00</option><option value="540">09:00–12:00</option><option value="720">12:00–15:00</option><option value="900">15:00–18:00</option><option value="1080">18:00–21:00</option><option value="1260">21:00–24:00</option></select></label>
         <label>What will you try or simply observe?<input id="focus-habit" maxlength="160" required placeholder="e.g. Tag my gym visits and notice the pattern"></label>
         <div id="habit-ideas" class="trace-controls" role="group" aria-label="Low effort observation ideas"><button type="button" data-experiment="tag">Tag context</button><button type="button" data-experiment="routine">Notice routines</button><button type="button" data-experiment="team">Ask my team</button></div>
@@ -115,7 +115,7 @@
         <div id="active-reminder-controls" hidden>
         <label class="consent"><input id="reminder-enabled" type="checkbox">Remind me for the active focus</label>
         <label>When?<select id="reminder-lead"><option value="15">15 minutes before</option><option value="0">At the start</option><option value="30">30 minutes before</option></select></label>
-        <label>For an activity focus<input id="reminder-time" type="time" value="18:00"></label>
+        <label>For activity / stress focuses<input id="reminder-time" type="time" value="18:00"></label>
         <div class="reminder-times"><label>Quiet from<input id="quiet-start" type="time" value="22:00"></label><label>Until<input id="quiet-end" type="time" value="08:00"></label></div>
         <button id="save-reminder" class="quiet">Save active focus reminder</button><p class="hint">Quiet hours skip a reminder rather than moving it to an unrelated time. Equal quiet times turn quiet hours off. Delivery is best-effort, never a glucose alarm.</p>
         </div>
