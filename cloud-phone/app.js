@@ -177,7 +177,7 @@
     const enough=base?.eligible>=5&&current?.eligible>=5;
     $('focus-comparison').textContent=(enough?'Both periods have at least five covered windows. These are descriptive observations, not evidence that your experiment caused a change.':'Comparison is provisional: at least five covered windows in each period are needed before interpreting a change.')+(f.kind==='activity'?' Activity means the two hours after a tag; overlapping tags are combined. Untagged activity is unknown.':' Only complete three-hour windows with at least 70% sample coverage are counted.');
   }
-  function resetCoach(){chosenSuggestion=null;$('coach-consent').checked=false;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
+  function resetCoach(){chosenSuggestion=null;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
   const candidateTitle=c=>c.kind==='activity'?'Around tagged activity':`${c.kind==='high'?'Above':'Below'} range · ${clock(c.start)}–${clock(c.end)}`;
   function validateChoice(c){
     const validFraction=n=>n===null||typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=1;
@@ -187,11 +187,9 @@
   }
   $('coach-find').onclick=()=>run(async()=>{
     if(readFocus())throw new Error('Finish the current focus before choosing another.');
-    if(!$('coach-consent').checked){$('coach-status').textContent='Confirm sharing summaries for this request first.';return;}
     $('coach-status').textContent='Checking coverage and preparing a few choices…';$('coach-suggestions').replaceChildren();chosenSuggestion=null;$('selected-focus-note').hidden=true;
     try{
       const result=await request('/functions/v1/orbit-coach',{method:'POST',body:JSON.stringify({consent:true})},await access());
-      $('coach-consent').checked=false;
       if(['insufficient_data','stale_data'].includes(result.mode)){$('coach-status').textContent=result.message||'Not enough recent covered data yet. You can choose an observation yourself.';return;}
       const generated=Date.parse(result.generated_at),choices=result.suggestions;
       if(result.mode!=='ai_assisted'||!Number.isFinite(generated)||generated>Date.now()+60000||Date.now()-generated>15*60000||!Array.isArray(choices)||choices.length<1||choices.length>3||!choices.every(validateChoice)||new Set(choices.map(c=>c.id)).size!==choices.length)throw new Error('The AI choices could not be validated. Nothing was selected.');
@@ -209,7 +207,7 @@
         };
         card.append(title,question,facts,reference,choose);$('coach-suggestions').append(card);
       }
-    }catch(error){$('coach-status').textContent=error.message;throw error;}finally{$('coach-consent').checked=false;}
+    }catch(error){$('coach-status').textContent=error.message;throw error;}
   });
   const clearSelection=()=>{chosenSuggestion=null;$('selected-focus-note').hidden=true;};
   $('focus-kind').onchange=()=>{clearSelection();$('focus-window-label').hidden=$('focus-kind').value==='activity';};
