@@ -150,7 +150,8 @@
   function writeStaples(list){const key=staplesKey();if(!key)throw new Error('Sign in again before saving a favourite.');localStorage.setItem(key,JSON.stringify(list));}
   function openText(foods='',portion=''){
     clearPhoto();$('food-confirm').hidden=false;$('foods').value=foods;$('portion').value=portion;
-    say('Describe the food and amount. No photo needed.');
+    $('food-confirm').scrollIntoView?.({behavior:'smooth',block:'start'});try{$('foods').focus({preventScroll:true});}catch{$('foods').focus();}
+    say('Type the food—or tap the microphone on your iPhone keyboard.');
   }
   function renderStaples(){
     $('staples').replaceChildren();$('manage-staples').textContent=editingStaples?'Done':'Edit';if(!session)return;
@@ -264,7 +265,8 @@
     const r=f.reminder||{};$('reminder-enabled').checked=!!r.enabled;$('reminder-lead').value=String(r.lead??15);$('reminder-time').value=clock(r.minute??1080);$('quiet-start').value=clock(r.quiet_start??1320);$('quiet-end').value=clock(r.quiet_end??480);
     drawLenses();
   }
-  function resetCoach(){coachContext=null;chosenSuggestion=null;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('selected-focus-note').hidden=true;}
+  function resetCoach(){coachContext=null;chosenSuggestion=null;$('coach-suggestions').replaceChildren();$('coach-status').textContent='';$('coach-manual').hidden=true;$('selected-focus-note').hidden=true;}
+  $('coach-manual').onclick=()=>{$('focus-plan').scrollIntoView?.({behavior:'smooth',block:'start'});$('focus-kind').focus({preventScroll:true});};
   const candidateTitle=c=>tagged(c.kind)?'After tagged '+c.kind:`${c.kind==='high'?'Above':'Below'} range · ${clock(c.start)}–${clock(c.end)}`;
   function validateChoice(c){
     const validFraction=n=>n===null||typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=1;
@@ -275,13 +277,14 @@
   $('coach-find').onclick=()=>run(async()=>{
     if(readFocus())throw new Error('Finish the current focus before choosing another.');
     if(coachContext&&cloudConfig.tag_focus_version!==2)throw new Error('Deploy the updated orbit-focus and orbit-coach functions, then Refresh cloud focus to enable tag coaching.');
-    $('coach-status').textContent='Checking coverage and preparing a few choices…';$('coach-suggestions').replaceChildren();chosenSuggestion=null;$('selected-focus-note').hidden=true;
+    $('coach-status').textContent='Looking across your recent rhythm…';$('coach-suggestions').replaceChildren();$('coach-manual').hidden=true;chosenSuggestion=null;$('selected-focus-note').hidden=true;$('coach-card').scrollIntoView?.({behavior:'smooth',block:'start'});
     try{
       const result=await request('/functions/v1/orbit-coach',{method:'POST',body:JSON.stringify({consent:true,...(coachContext?{tag_kind:coachContext}:{})})},await access());
-      if(['insufficient_data','stale_data'].includes(result.mode)){$('coach-status').textContent=result.message||'Not enough recent covered data yet. You can choose an observation yourself.';return;}
+      if(result.mode==='insufficient_data'){$('coach-status').textContent='No strong repeating pattern has enough covered days yet. Keep collecting—or choose something you already want to notice.';$('coach-manual').hidden=false;return;}
+      if(result.mode==='stale_data'){$('coach-status').textContent='The coach cannot see recent glucose data yet. Refresh the Dexcom status, then try again.';$('coach-manual').hidden=false;return;}
       const generated=Date.parse(result.generated_at),choices=result.suggestions;
       if(result.mode!=='ai_assisted'||!Number.isFinite(generated)||generated>Date.now()+60000||Date.now()-generated>15*60000||!Array.isArray(choices)||choices.length<1||choices.length>3||!choices.every(validateChoice)||new Set(choices.map(c=>c.id)).size!==choices.length)throw new Error('The AI choices could not be validated. Nothing was selected.');
-      $('coach-status').textContent='AI-assisted choices, backed by calculated observations. Choose only what feels useful.';
+      $('coach-status').textContent='These are the clearest recurring rhythms I found. Pick one only if it feels relevant.';
       for(const c of choices){
         const card=document.createElement('article');card.className='coach-choice';const title=document.createElement('h3');title.textContent=candidateTitle(c);
         const question=document.createElement('p');question.textContent=c.question;const facts=document.createElement('p');facts.className='hint';
@@ -296,7 +299,8 @@
         };
         card.append(title,question,facts,reference,choose);$('coach-suggestions').append(card);
       }
-    }catch(error){$('coach-status').textContent=error.message;throw error;}
+      $('coach-suggestions').firstElementChild?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+    }catch(error){$('coach-status').textContent='The coach could not complete this review: '+error.message;$('coach-manual').hidden=false;}
   });
   const clearSelection=()=>{coachContext=null;chosenSuggestion=null;$('selected-focus-note').hidden=true;};
   $('focus-kind').onchange=()=>{clearSelection();$('focus-window-label').hidden=tagged($('focus-kind').value);};
@@ -321,8 +325,11 @@
   $('refresh-focus').onclick=()=>run(async()=>{await loadCloudFocus();if(cloudReady&&readFocus())await reviewCloud();});
   async function reviewCloud(){const f=readFocus(),current=generation;if(!f?.cloud)throw Error('Progress updates need the cloud focus setup.');const result=await focusCall({action:'review',id:f.id});if(current!==generation||readFocus()?.id!==f.id)return;focusFacts=result.facts;renderFocus();}
   $('focus-review').onclick=()=>run(reviewCloud);
-  $('focus-ask').onclick=()=>run(async()=>{const f=readFocus(),current=generation;if(!f?.cloud)throw Error('Deploy the cloud focus function first.');$('focus-ai-answer').textContent='Taking a small look…';$('focus-ai-ideas').replaceChildren();const result=await focusCall({action:'coach',id:f.id,consent:true});if(current!==generation||readFocus()?.id!==f.id)return;focusFacts=result.facts;renderFocus();$('focus-ai-answer').textContent=result.question;
-    for(const idea of result.ideas||[]){const p=document.createElement('p');p.className='hint';p.textContent=idea;$('focus-ai-ideas').append(p);}
+  $('focus-ask').onclick=()=>run(async()=>{const f=readFocus(),current=generation;if(!f?.cloud)throw Error('Cloud Coach is not connected yet. Tap Refresh cloud focus.');
+    $('focus-ai-answer').textContent='Looking at this week so far…';$('focus-ai-ideas').replaceChildren();$('focus-ai-answer').scrollIntoView?.({behavior:'smooth',block:'center'});
+    try{const result=await focusCall({action:'coach',id:f.id,consent:true});if(current!==generation||readFocus()?.id!==f.id)return;focusFacts=result.facts;renderFocus();$('focus-ai-answer').textContent=result.question||'What feels most worth noticing next?';
+      for(const idea of result.ideas||[]){const p=document.createElement('p');p.className='hint';p.textContent=idea;$('focus-ai-ideas').append(p);}
+    }catch(error){$('focus-ai-answer').textContent='The coach could not check in: '+error.message;}
   });
   $('keep-focus').onclick=()=>run(async()=>{await cloudAction('reflect',{worked:$('focus-worked').value.trim()});$('focus-worked').value='';toast('Saved what you found useful ✓');});
   const minutes=value=>{const [h,m]=value.split(':').map(Number);return h*60+m;};
