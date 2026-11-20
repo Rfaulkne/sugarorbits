@@ -16,7 +16,7 @@
 <script src="focus-core.js?v=20261119-tag-ready-1" defer></script>
 <script src="rhythm-calm.js?v=20261119-tag-ready-1" defer></script>
 <script src="pwa.js?v=20261119-tag-ready-1" defer></script>
-<script src="app.js?v=20261120-light-2" defer></script>
+<script src="app.js?v=20261120-fix-flow-1" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
   <details class="install-help"><summary>Keep Sugar Orbits on your phone</summary><p>Open this link in Safari, tap Share, then Add to Home Screen. Open the new icon to use app mode and enable reminders. Internet is required; health data is not cached for offline use.</p><p id="install-status" class="hint"></p></details>
@@ -91,10 +91,11 @@
       <p id="cloud-focus-status" class="hint" role="status"></p><button id="refresh-focus" class="quiet">Refresh cloud focus</button><button id="move-local-focus" class="quiet" hidden>Start a new cloud week from my device-only plan</button>
       <p class="eyebrow">ONE SMALL FOCUS</p><h1 class="rhythm-title">Keep one thread.</h1><p>Notice what happens together. You choose what to explore.</p>
       <p id="focus-observation" class="hint">No pattern conclusions are generated without enough covered days.</p>
-      <article class="card" id="coach-card"><p class="eyebrow">AI-ASSISTED CHOICES · YOU DECIDE</p><p>Calculations notice recurring periods. AI helps present a few possibilities—not their causes.</p>
+      <article class="card" id="coach-card"><p class="eyebrow">A QUIET SECOND LOOK</p><p>Let the coach find the clearest repeating rhythm. You decide whether it matters.</p>
         <p id="coach-active-note" class="hint" hidden>Your focus is underway. Check in below, ask the coach for an observation idea, or review progress. Finish or save a reflection before choosing another focus.</p>
-        <div id="coach-new-options"><button id="coach-find">Find a focus with AI</button><p class="hint">Calculated summaries only—raw readings, timestamps and notes stay out of AI.</p></div>
+        <div id="coach-new-options"><button id="coach-find">Show what stands out</button><p class="hint">Calculated summaries only—raw readings, timestamps and notes stay out of AI.</p></div>
         <p id="coach-status" role="status" aria-live="polite"></p><div id="coach-suggestions"></div>
+        <button id="coach-manual" class="secondary" hidden>Choose a focus myself</button>
       </article>
       <p id="selected-focus-note" class="hint" hidden></p>
       <form id="focus-plan" class="card">
@@ -109,7 +110,7 @@
         <p class="eyebrow">A SMALL CHECK-IN</p><p id="focus-prompt">How did your chosen experiment fit today?</p><div class="checkin-actions"><button data-checkin="tried">Tried it</button><button data-checkin="not-today" class="secondary">Not today</button><button data-checkin="skip" class="quiet">Skip</button></div><p id="focus-checkin-status" class="hint" role="status"></p>
         <details><summary>Add a thought</summary><label>Optional reflection<input id="focus-note" maxlength="240" placeholder="Anything you noticed, without needing a perfect record"></label><button id="save-focus-note" class="quiet">Save thought</button></details>
       </article><article class="card"><h2>What is being observed?</h2><p id="focus-progress"></p><p id="focus-comparison" class="hint"></p><p id="focus-tags" class="hint"></p><button id="focus-review" class="quiet">Update progress</button><p class="hint">Associations only. Tags do not establish causes; fewer highs are not presented as a win without also showing lows and coverage.</p></article>
-      <article class="card"><h2>A little help choosing your next step.</h2><button id="focus-ask">Ask coach</button><p class="hint">The coach sees summaries and check-in counts—not your notes or raw readings.</p><p id="focus-ai-answer" role="status"></p><div id="focus-ai-ideas"></div></article>
+      <article class="card"><h2>A little help choosing your next step.</h2><button id="focus-ask">Check in with coach</button><p class="hint">The coach sees summaries and check-in counts—not your notes or raw readings.</p><p id="focus-ai-answer" role="status"></p><div id="focus-ai-ideas"></div></article>
       <article id="focus-reflection" class="card" hidden><h2 id="focus-outcome-title">What would you like to keep?</h2><p class="hint">Even a clearer improvement is not proof of a cause or a permanent resolution. What do you think worked well?</p><label>One thing worth remembering<input id="focus-worked" maxlength="240" placeholder="Something that felt practical for me"></label><button id="keep-focus">Save what helped</button></article>
       <button id="finish-focus" class="quiet">Finish this focus</button></div>
       <article class="card"><h2>Reminders that fit the moment.</h2><p class="hint">Focus reminders follow the chosen window in Europe/Berlin, including daylight-saving changes. Activity focuses use the clock time below. Nothing is enabled automatically.</p>
@@ -126,7 +127,7 @@
     </section>
     <section id="panel-food" hidden>
       <h2>A second look at your plate.</h2><p>Scan it. Say it. Or tap a staple.</p>
-      <div class="food-actions"><button id="scan-now">◎ Scan now</button><button id="text-food" class="secondary">Say / type</button></div>
+      <div class="food-actions"><button id="scan-now">◎ Scan now</button><button id="text-food" class="secondary">Type or dictate</button></div>
       <div class="staples-head"><h3>Your staples</h3><button id="manage-staples" class="quiet">Edit</button></div><div id="staples" class="staples"></div>
       <p class="hint">Favourites save food names and usual portions on this device, separately per account—not carb estimates. They do not sync yet.</p>
       <details><summary class="quiet">Or choose an existing photo</summary><input id="photo" type="file" accept="image/*" capture="environment"></details>
@@ -134,7 +135,7 @@
       <p class="hint">A resized photo is analyzed only when you tap Identify. Sugar Orbits does not save it.</p>
       <button id="identify" disabled hidden>Identify food with AI</button>
       <div id="food-confirm" hidden>
-        <label>Is this right? Correct anything missed.<textarea id="foods" maxlength="500" rows="3"></textarea></label>
+        <label>What are you eating?<textarea id="foods" maxlength="500" rows="3" placeholder="e.g. dark bread with peanut butter"></textarea></label>
         <label>How much will you eat?<input id="portion" maxlength="300" placeholder="e.g. 150 g cooked rice and half the tofu"></label>
         <p class="hint">Prefer speaking? Tap the microphone on your iPhone keyboard. Include cooked or dry weight where relevant.</p>
         <button id="estimate">Confirm foods & estimate carbs</button>
