@@ -137,7 +137,7 @@
     stopCamera();
     photoGeneration++;image=null;$('photo').value='';$('photo-preview').hidden=true;$('photo-preview').removeAttribute('src');
     $('food-confirm').hidden=true;$('food-result').hidden=true;$('foods').value='';$('portion').value='';$('food-consent').checked=false;$('identify').disabled=true;
-    $('carbs').textContent='';$('food-question').textContent='';$('assumptions').replaceChildren();
+    $('carbs').textContent='';$('food-question').textContent='';$('assumptions').replaceChildren();$('food-breakdown').replaceChildren();$('food-choice-buttons').replaceChildren();$('food-alternatives').hidden=true;
     $('identify').hidden=true;
   }
   const defaults=[{foods:'Rice (cooked)',portion:'100 g cooked'},{foods:'Bread',portion:''}];
@@ -405,6 +405,44 @@
     if(!$('food-consent').checked)throw new Error('Please confirm sending this request to OpenAI.');
     return request('/functions/v1/food-genie',{method:'POST',body:JSON.stringify({...payload,consent:true})},await access());
   }
+  function range(low,high){return `${Math.round(low)}–${Math.round(high)} g`;}
+  function fallbackFoodChoices(draft,foods,portion){
+    const words=`${foods} ${portion} ${draft.question||''}`.toLowerCase();
+    if(!draft.needs_more_info||!words.includes('bread')||!/(spread|topping|brown)/.test(words))return draft;
+    return {...draft,
+      base_items:[{label:'Dark bread',portion:'about 1 cm slice',carbs_low_g:15,carbs_high_g:25}],
+      alternatives:[
+        {label:'Jam',carbs_low_g:10,carbs_high_g:20,note:'typical visible spread'},
+        {label:'Peanut butter',carbs_low_g:3,carbs_high_g:7,note:'typical visible spread'},
+        {label:'Chocolate spread',carbs_low_g:8,carbs_high_g:18,note:'typical visible spread'}
+      ]
+    };
+  }
+  function renderFoodDraft(raw,foods,portion){
+    const draft=fallbackFoodChoices(raw,foods,portion),base=Array.isArray(draft.base_items)?draft.base_items:[],choices=Array.isArray(draft.alternatives)?draft.alternatives:[];
+    $('food-question').textContent=draft.question||'';$('assumptions').replaceChildren();$('food-breakdown').replaceChildren();$('food-choice-buttons').replaceChildren();$('food-alternatives').hidden=!choices.length;
+    for(const item of base){
+      if(!Number.isFinite(item.carbs_low_g)||!Number.isFinite(item.carbs_high_g))continue;
+      const row=document.createElement('div');row.className='food-line';
+      const label=document.createElement('span');label.textContent=item.label+(item.portion?` · ${item.portion}`:'');
+      const value=document.createElement('strong');value.textContent=range(item.carbs_low_g,item.carbs_high_g);row.append(label,value);$('food-breakdown').append(row);
+    }
+    const baseLow=base.reduce((sum,item)=>sum+(Number.isFinite(item.carbs_low_g)?item.carbs_low_g:0),0),baseHigh=base.reduce((sum,item)=>sum+(Number.isFinite(item.carbs_high_g)?item.carbs_high_g:0),0);
+    if(draft.carbs_low_g!==null&&draft.carbs_high_g!==null)$('carbs').textContent=range(draft.carbs_low_g,draft.carbs_high_g);
+    else if(base.length)$('carbs').textContent=`${range(baseLow,baseHigh)} before the uncertain part`;
+    else $('carbs').textContent='A few likely possibilities';
+    for(const choice of choices){
+      if(!Number.isFinite(choice.carbs_low_g)||!Number.isFinite(choice.carbs_high_g))continue;
+      const button=document.createElement('button');button.type='button';button.className='food-choice';button.setAttribute('aria-pressed','false');
+      const label=document.createElement('span');label.textContent=choice.label;
+      const value=document.createElement('strong');value.textContent=`+ ${range(choice.carbs_low_g,choice.carbs_high_g)}`;
+      const note=document.createElement('small');note.textContent=choice.note||'';button.append(label,value,note);
+      button.onclick=()=>{for(const other of $('food-choice-buttons').querySelectorAll('button'))other.setAttribute('aria-pressed',String(other===button));$('carbs').textContent=range(baseLow+choice.carbs_low_g,baseHigh+choice.carbs_high_g);};
+      $('food-choice-buttons').append(button);
+    }
+    for(const item of draft.assumptions||[]){const li=document.createElement('li');li.textContent=item;$('assumptions').append(li);}
+    $('food-result').hidden=false;
+  }
   $('identify').onclick=()=>run(async()=>{
     if(!image)throw new Error('Choose a photo first.');say('Looking at your photo…');
     const draft=await food({mode:'identify',image});$('foods').value=draft.foods.join(', ');$('food-confirm').hidden=false;$('food-result').hidden=true;
@@ -412,10 +450,7 @@
   });
   $('estimate').onclick=()=>run(async()=>{
     const foods=$('foods').value.trim(),portion=$('portion').value.trim();if(!foods||!portion)throw new Error('Confirm the foods and describe the amount first.');
-    say('Estimating a rough range…');const draft=await food({mode:'estimate',foods,portion});
-    $('carbs').textContent=draft.carbs_low_g===null?'More detail needed':`${Math.round(draft.carbs_low_g)}–${Math.round(draft.carbs_high_g)} g`;
-    $('food-question').textContent=draft.question;$('assumptions').replaceChildren();for(const item of draft.assumptions){const li=document.createElement('li');li.textContent=item;$('assumptions').append(li);}
-    $('food-result').hidden=false;say('');
+    say('Estimating a rough range…');const draft=await food({mode:'estimate',foods,portion});renderFoodDraft(draft,foods,portion);say('');
   });
   for(const id of ['foods','portion'])$(id).oninput=()=>{$('food-result').hidden=true;};
   $('clear-photo').onclick=()=>{if(!busy){clearPhoto();say('Photo and draft cleared.');}};
