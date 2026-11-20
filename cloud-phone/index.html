@@ -8,13 +8,14 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="app-icon-180.png">
 <title>Sugar Orbits · Rhythm</title>
-<link rel="stylesheet" href="style.css?v=20261119-tag-ready-1">
+<link rel="stylesheet" href="style.css?v=20261120-food-choices-1">
+<style>.food-line{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:14px 0;border-bottom:1px solid #2c372e;color:#b9c3b4}.food-line span{font-size:.875rem;line-height:1.4}.food-line strong{white-space:nowrap;font-size:.875rem;font-weight:500;color:#dbe7cc}.choice-label{margin:22px 0 10px;color:#d7e2cd}.food-choice{width:100%;display:grid;grid-template-columns:1fr auto;text-align:left;gap:4px 12px;margin:8px 0;padding:14px 16px;background:#18211b;color:#dce5d4;border:1px solid #394738}.food-choice strong{font-weight:500;color:#c4d7a0}.food-choice small{grid-column:1/-1;color:#8f9b8e}.food-choice[aria-pressed=true]{border-color:#b4a4d0;background:#292431}.food-choice[aria-pressed=true] strong{color:#e0d4f0}</style>
 <script src="rhythm.js?v=20261119-tag-ready-1" defer></script><script src="orbit-draw.js?v=20261119-tag-ready-1" defer></script>
 <script src="after-moment.js?v=20261119-tag-ready-1" defer></script>
 <script src="focus-core.js?v=20261119-tag-ready-1" defer></script>
 <script src="rhythm-calm.js?v=20261119-tag-ready-1" defer></script>
 <script src="pwa.js?v=20261119-tag-ready-1" defer></script>
-<script src="app.js?v=20261119-tag-ready-1" defer></script>
+<script src="app.js?v=20261120-food-choices-1" defer></script>
 <main>
   <header><span class="mark">◌</span><span>SUGAR ORBITS</span></header>
   <details class="install-help"><summary>Keep Sugar Orbits on your phone</summary><p>Open this link in Safari, tap Share, then Add to Home Screen. Open the new icon to use app mode and enable reminders. Internet is required; health data is not cached for offline use.</p><p id="install-status" class="hint"></p></details>
@@ -139,7 +140,7 @@
         <button id="estimate">Confirm foods & estimate carbs</button>
         <button id="save-staple" class="quiet">☆ Save as a staple</button>
       </div>
-      <div id="food-result" class="card" aria-live="polite" hidden><p class="eyebrow">ROUGH CARBOHYDRATE ESTIMATE</p><strong id="carbs"></strong><p id="food-question"></p><ul id="assumptions"></ul><p class="hint">Photos and portions can be misread. Independently check ingredients and quantity. Do not use this estimate alone for insulin decisions. This draft is not saved as a food event.</p></div>
+      <div id="food-result" class="card" aria-live="polite" hidden><p class="eyebrow">ROUGH CARBOHYDRATE ESTIMATE</p><strong id="carbs"></strong><p id="food-question"></p><div id="food-breakdown"></div><div id="food-alternatives" hidden><p class="choice-label">Which looks closest?</p><div id="food-choice-buttons"></div></div><ul id="assumptions"></ul><p class="hint">Photos and portions can be misread. Independently check ingredients and quantity. Do not use this estimate alone for insulin decisions. This draft is not saved as a food event.</p></div>
       <button id="clear-photo" class="quiet">Clear photo & draft</button>
       <p class="hint">Test limit: 20 AI requests per day; wait 10 seconds between requests. Usually two requests per meal.</p>
     </section>
