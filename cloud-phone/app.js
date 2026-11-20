@@ -26,7 +26,7 @@
   const A=window.OrbitAfterMoment;
   const F=window.OrbitFocusCore,SESSION_KEY='orbit-personal-session-v1';
   let remember=false,cloudReady=false,cloudKnown=false,cloudPlans=[],cloudConfig={},focusFacts=null;
-  function persistSession(){try{if(remember&&session)localStorage.setItem(SESSION_KEY,JSON.stringify({access_token:session.access_token,refresh_token:session.refresh_token,expires_at:session.expires_at,user:{id:session.user.id}}));else localStorage.removeItem(SESSION_KEY);}catch{remember=false;$('remember-device').checked=false;say('This browser could not remember sign-in. The session is temporary.');}}
+  function persistSession(){try{if(remember&&session)localStorage.setItem(SESSION_KEY,JSON.stringify({access_token:session.access_token,refresh_token:session.refresh_token,expires_at:session.expires_at,user:{id:session.user.id}}));else localStorage.removeItem(SESSION_KEY);}catch{remember=false;say('This browser could not remember sign-in. The session is temporary.');}}
   async function focusCall(payload){return request('/functions/v1/orbit-focus',{method:'POST',body:JSON.stringify(payload)},await access());}
   function applyCloud(result){if(!Array.isArray(result?.plans))throw Error('Unexpected cloud focus response.');cloudPlans=result.plans;cloudReady=true;cloudKnown=true;focusFacts=null;renderFocus();renderKept();}
   async function loadCloudFocus(){
@@ -136,7 +136,7 @@
   function clearPhoto() {
     stopCamera();
     photoGeneration++;image=null;$('photo').value='';$('photo-preview').hidden=true;$('photo-preview').removeAttribute('src');
-    $('food-confirm').hidden=true;$('food-result').hidden=true;$('foods').value='';$('portion').value='';$('food-consent').checked=false;$('identify').disabled=true;
+    $('food-confirm').hidden=true;$('food-result').hidden=true;$('foods').value='';$('portion').value='';$('identify').disabled=true;
     $('carbs').textContent='';$('food-question').textContent='';$('assumptions').replaceChildren();$('food-breakdown').replaceChildren();$('food-choice-buttons').replaceChildren();$('food-alternatives').hidden=true;
     $('identify').hidden=true;
   }
@@ -203,7 +203,7 @@
     say('Signing in…');
     const password=$('password').value;$('password').value='';
     session=await request('/auth/v1/token?grant_type=password', {method:'POST',body:JSON.stringify({email:$('email').value.trim(),password})});
-    remember=$('remember-device').checked;generation++;persistSession();showSession();say('Connected.');await loadCloudFocus();
+    remember=true;generation++;persistSession();showSession();say('Connected.');await loadCloudFocus();
     try{await refreshDexcom();}catch{$('dexcom-status').textContent='Could not load glucose status. Open Coach and try Refresh status.';}
     try{await loadRhythm();}catch{$('rhythm-coverage').textContent='Could not load the complete rhythm window. Use Refresh status below to retry. No pattern conclusions are shown.';}
   });};
@@ -402,7 +402,6 @@
   // The project URL constant above intentionally differs from the browser URL API.
   function URLglobal(){return window.URL;}
   async function food(payload){
-    if(!$('food-consent').checked)throw new Error('Please confirm sending this request to OpenAI.');
     return request('/functions/v1/food-genie',{method:'POST',body:JSON.stringify({...payload,consent:true})},await access());
   }
   function range(low,high){return `${Math.round(low)}–${Math.round(high)} g`;}
@@ -465,7 +464,7 @@
     let saved;try{saved=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch{return;}
     if(!saved?.access_token||!saved?.refresh_token||!saved?.user?.id||!Number.isFinite(saved.expires_at))return;
     await run(async()=>{remember=true;session=saved;
-      try{const token=await access(),user=await request('/auth/v1/user',{},token);if(!user?.id)throw Error('Session expired.');session.user={id:user.id};persistSession();generation++;showSession();$('remember-device').checked=true;}
+      try{const token=await access(),user=await request('/auth/v1/user',{},token);if(!user?.id)throw Error('Session expired.');session.user={id:user.id};persistSession();generation++;showSession();}
       catch{session=null;remember=false;generation++;persistSession();showSession();say('Please sign in again. Your saved cloud data is unchanged.');return;}
       await loadCloudFocus();
       try{await refreshDexcom();await loadRhythm();say('Welcome back.');}catch{say('Signed in. Data refresh is unavailable; try Refresh status when connected.');}
